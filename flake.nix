@@ -17,7 +17,7 @@
   };
 
   outputs = { self, nixpkgs, crate2nix, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+    flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         crateName = "update-daemon";
@@ -71,7 +71,7 @@
                 enable = true;
                 secretFile = "/run/secrets/update-daemon/environment";
                 package = self.packages.x86_64-linux.update-daemon;
-                repos.github.serokell.update-daemon = {};
+                repos.github.serokell.update-daemon = { };
                 settings = {
                   author.email = "operations@serokell.io";
                   author.name = "Update Bot";
