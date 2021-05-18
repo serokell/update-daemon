@@ -16,7 +16,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, crate2nix, flake-utils }:
+  outputs = { self, nixpkgs, crate2nix, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -52,5 +52,32 @@
             pkgs.reuse
           ];
         };
-      });
+      }) // {
+        nixosModules.update-daemon = import ./module.nix self;
+        nixosConfigurations.container = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            self.nixosModules.update-daemon
+
+            ({ config, pkgs, lib, ... }: {
+              system.configurationRevision = lib.mkIf (self ? rev) self.rev;
+              boot.isContainer = true;
+              networking.useDHCP = false;
+              networking.firewall.allowedTCPPorts = [ 80 ];
+              networking.hostName = "update-daemon";
+
+              services.update-daemon = {
+                enable = true;
+                secretFile = "/run/secrets/update-daemon/environment";
+                package = self.packages.x86_64-linux.update-daemon;
+                repos.github.serokell.update-daemon = {};
+                settings = {
+                  author.email = "operations@serokell.io";
+                  author.name = "Update Bot";
+                };
+              };
+            })
+          ];
+        };
+      };
 }

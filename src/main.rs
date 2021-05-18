@@ -74,7 +74,7 @@ async fn update_repo(
 ) -> Result<(), UpdateError> {
     info!("Updating {}", handle);
     let repo = init_repo(state, settings.clone(), handle.clone())?;
-    let diff = flake_update(repo.clone()).await?;
+    let diff = flake_update(repo.clone())?;
     if diff.len() > 1 {
         info!("{}:\n{}", handle, diff);
         commit(settings.clone(), repo.clone(), diff.clone())?;
