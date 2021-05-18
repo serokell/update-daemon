@@ -42,14 +42,15 @@
 
         devShell = pkgs.mkShell {
           inputsFrom = builtins.attrValues self.packages.${system};
-          buildInputs = [
-            pkgs.cargo
-            pkgs.rust-analyzer
-            pkgs.rustfmt
-            pkgs.clippy
-            pkgs.openssl
-            pkgs.pkg-config
-            pkgs.reuse
+          buildInputs = with pkgs; [
+            nixUnstable
+            cargo
+            rust-analyzer
+            rustfmt
+            clippy
+            openssl
+            pkg-config
+            reuse
           ];
         };
       }) // {
