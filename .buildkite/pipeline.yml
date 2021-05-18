@@ -6,3 +6,8 @@ steps:
   - label: Check Nix flake
     commands:
       - nix-shell --run 'nix --experimental-features "nix-command flakes" flake check -L'
+
+steps:
+  - label: Check that the executable builds
+    commands:
+      - nix-build
