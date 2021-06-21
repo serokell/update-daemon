@@ -9,7 +9,7 @@ use log::*;
 
 #[derive(Debug, Error)]
 pub enum PullRequestError {
-    #[error("Error during a github operation: {0}")]
+    #[error("Error during a github operation: {0:?}")]
     GithubError(#[from] octocrab::Error),
     #[error("Couldn't get a GITHUB_TOKEN env var: {0}")]
     TokenError(#[from] std::env::VarError),
@@ -34,17 +34,14 @@ pub async fn submit_or_update_pull_request(
         .send()
         .await?;
     if let Some(pr) = page.items.pop() {
-        let mut body = pr.body.unwrap_or("".to_string());
-        body.push_str("\n---\n");
-        body.push_str(diff.as_str());
         crab.issues(owner, repo)
             .update(pr.number as u64)
             .title(settings.title.as_str())
-            .body(body.as_str())
+            .body(&diff)
             .assignees(settings.assignees.as_slice())
             .send()
             .await?;
-        info!("Updated PR {}", pr.url);
+        info!("Updated PR {}", pr.html_url);
     } else {
         let pr = crab
             .pulls(owner.clone(), repo.clone())
@@ -61,7 +58,7 @@ pub async fn submit_or_update_pull_request(
             .assignees(settings.assignees.as_slice())
             .send()
             .await?;
-        info!("Submitted PR {}", pr.url);
+        info!("Submitted PR {}", pr.html_url);
     }
 
     Ok(())

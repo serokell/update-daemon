@@ -92,6 +92,11 @@ pub fn init_repo(
             Some(&mut fetch_options),
             None,
         )?;
+        repo.find_remote("origin")?.fetch(
+            &[update_branch_name.clone()],
+            Some(&mut fetch_options),
+            None,
+        )?;
         repo
     } else {
         debug!("Cloning {} to {:?}", handle, repo_dir);
@@ -106,6 +111,7 @@ pub fn init_repo(
             }
         }
     }));
+
     {
         let repo = repo_cell.lock().unwrap();
 
@@ -119,57 +125,81 @@ pub fn init_repo(
 
         repo.reset(&default_branch_commit, ResetType::Hard, None)?;
         repo.set_head(format!("refs/heads/{}", default_branch_name.clone()).as_str())?;
-
-        let update_branch = repo.find_branch(
-            format!("origin/{}", update_branch_name.clone()).as_str(),
-            BranchType::Remote,
-        );
-
-        match update_branch {
-            Err(_) => {
-                repo.branch(
-                    update_branch_name.clone().as_str(),
-                    default_branch_commit.as_commit().unwrap(),
-                    true,
-                )?;
-            }
-            Ok(remote_update_branch) => {
-                repo.branch(
-                    update_branch_name.clone().as_str(),
-                    remote_update_branch
-                        .into_reference()
-                        .peel(ObjectType::Commit)?
-                        .as_commit()
-                        .unwrap(),
-                    true,
-                )?;
-                let local_update_branch = repo.find_branch(
-                    format!("{}", update_branch_name.clone()).as_str(),
-                    BranchType::Local,
-                )?;
-                let update_branch_commit = local_update_branch
-                    .into_reference()
-                    .peel(ObjectType::Commit)?;
-                let update_annotated_commit =
-                    repo.find_annotated_commit(update_branch_commit.id())?;
-                let default_annotated_commit =
-                    repo.find_annotated_commit(default_branch_commit.id())?;
-                let rebase = repo.rebase(
-                    Some(&update_annotated_commit),
-                    None,
-                    Some(&default_annotated_commit),
-                    None,
-                )?;
-                for _ in rebase {
-                    let commiter = make_signature(settings.clone())?;
-                    repo.open_rebase(None)?.commit(None, &commiter, None)?;
-                }
-                repo.open_rebase(None)?.finish(None)?;
-            }
-        }
-        repo.set_head(format!("refs/heads/{}", update_branch_name).as_str())?;
     }
+
     Ok(repo_cell)
+}
+
+#[derive(Debug, Error)]
+pub enum SetupUpdateBranchError {
+    #[error("Error during a git operation: {0}")]
+    GitError(#[from] git2::Error),
+    #[error("Error during creating author's signatuire: {0}")]
+    AuthorError(#[from] AuthorError),
+}
+
+pub fn setup_update_branch(
+    settings: UpdateSettings,
+    repo_cell: Arc<Mutex<Repository>>,
+) -> Result<(), SetupUpdateBranchError> {
+    let repo = repo_cell.lock().unwrap();
+    let default_branch_name = settings.clone().default_branch;
+    let update_branch_name = settings.clone().update_branch;
+    let update_branch = repo.find_branch(
+        format!("origin/{}", update_branch_name.clone()).as_str(),
+        BranchType::Remote,
+    );
+    let default_branch_commit = repo
+        .find_branch(
+            format!("origin/{}", default_branch_name.clone()).as_str(),
+            BranchType::Remote,
+        )?
+        .into_reference()
+        .peel(ObjectType::Commit)?;
+
+    match update_branch {
+        Err(_) => {
+            repo.branch(
+                update_branch_name.clone().as_str(),
+                default_branch_commit.as_commit().unwrap(),
+                true,
+            )?;
+        }
+        Ok(remote_update_branch) => {
+            repo.branch(
+                update_branch_name.clone().as_str(),
+                remote_update_branch
+                    .into_reference()
+                    .peel(ObjectType::Commit)?
+                    .as_commit()
+                    .unwrap(),
+                true,
+            )?;
+            let local_update_branch = repo.find_branch(
+                format!("{}", update_branch_name.clone()).as_str(),
+                BranchType::Local,
+            )?;
+            let update_branch_commit = local_update_branch
+                .into_reference()
+                .peel(ObjectType::Commit)?;
+            let update_annotated_commit = repo.find_annotated_commit(update_branch_commit.id())?;
+            let default_annotated_commit =
+                repo.find_annotated_commit(default_branch_commit.id())?;
+            let rebase = repo.rebase(
+                Some(&update_annotated_commit),
+                None,
+                Some(&default_annotated_commit),
+                None,
+            )?;
+            for _ in rebase {
+                let commiter = make_signature(settings.clone())?;
+                repo.open_rebase(None)?.commit(None, &commiter, None)?;
+            }
+            repo.open_rebase(None)?.finish(None)?;
+        }
+    }
+    repo.set_head(format!("refs/heads/{}", update_branch_name).as_str())?;
+    Ok(())
 }
 
 #[derive(Debug, Error)]

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use std::process::{Command, Stdio};
+use std::process::Command;
 use xdg::BaseDirectories;
 
 use log::*;
@@ -15,6 +15,7 @@ use serde_json::from_str;
 
 mod git;
 use git::*;
+mod flake_lock;
 mod types;
 use types::*;
 mod request;
@@ -43,7 +44,6 @@ fn flake_update<'a>(repo: Arc<Mutex<Repository>>) -> Result<String, FlakeUpdateE
             .to_str()
             .unwrap(),
     );
-    nix_flake_update.stderr(Stdio::piped());
     let output = nix_flake_update.output()?;
 
     let output = std::str::from_utf8(&output.stderr)?;
@@ -57,6 +57,10 @@ fn flake_update<'a>(repo: Arc<Mutex<Repository>>) -> Result<String, FlakeUpdateE
 enum UpdateError {
     #[error("Error during repository initialisation: {0}")]
     InitError(#[from] git::InitError),
+    #[error("Failed to get flake lock information: {0}")]
+    GetLockError(#[from] flake_lock::GetLockError),
+    #[error("Error during update branch setup: {0}")]
+    SetupUpdateBranchError(#[from] git::SetupUpdateBranchError),
     #[error("Error during flake update: {0}")]
     FlakeUpdateError(#[from] FlakeUpdateError),
     #[error("Error during git commit: {0}")]
@@ -74,12 +78,25 @@ async fn update_repo(
 ) -> Result<(), UpdateError> {
     info!("Updating {}", handle);
     let repo = init_repo(state, settings.clone(), handle.clone())?;
-    let diff = flake_update(repo.clone())?;
-    if diff.len() > 1 {
+    let workdir = repo
+        .clone()
+        .lock()
+        .unwrap()
+        .workdir()
+        .unwrap()
+        .to_path_buf();
+    let default_branch_lock = flake_lock::get_lock(&workdir.clone())?;
+    setup_update_branch(settings.clone(), repo.clone())?;
+    let before = flake_lock::get_lock(&workdir.clone())?;
+    flake_update(repo.clone())?;
+    let after = flake_lock::get_lock(&workdir)?;
+    let diff = before.diff(&after);
+    if diff.len() > 0 {
+        let diff_default = default_branch_lock.diff(&after);
         info!("{}:\n{}", handle, diff);
-        commit(settings.clone(), repo.clone(), diff.clone())?;
+        commit(settings.clone(), repo.clone(), diff.to_string())?;
         push(settings.clone(), repo.clone())?;
-        submit_or_update_request(settings, handle, diff).await?;
+        submit_or_update_request(settings, handle, diff_default.to_string()).await?;
     } else {
         info!("{}: Nothing to update", handle);
     }
@@ -96,6 +113,19 @@ struct Options {
     /// Verbosity level
     #[clap(default_value = "info", long, short)]
     verbosity: log::LevelFilter,
+    #[clap(subcommand)]
+    subcmd: Option<SubCommand>,
+}
+
+#[derive(Debug, Clap)]
+enum SubCommand {
+    #[clap()]
+    CheckConfig,
+    #[clap()]
+    DiffLocks {
+        old: flake_lock::Lock,
+        new: flake_lock::Lock,
+    },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -113,34 +143,55 @@ async fn main() {
 
     builder.filter_level(options.verbosity).init();
 
+    if let Some(SubCommand::DiffLocks { old, new }) = options.subcmd {
+        debug!("old:\n{:#?}", old);
+        debug!("new:\n{:#?}", new);
+        let diff = old.diff(&new);
+        debug!("diff:\n{:#?}", diff);
+        info!("formatted diff:\n{}", diff);
+        std::process::exit(0);
+    }
+
     let xdg = BaseDirectories::new().unwrap();
     let cache_dir = xdg.create_cache_directory("update-daemon").unwrap();
     let config_file = xdg.find_config_file("update-daemon/config.json");
 
-    let config : Config = from_str(
+    let config: Config = from_str(
         std::fs::read_to_string(
             options
                 .config
                 .unwrap_or(config_file.unwrap().to_string_lossy().to_string()),
         )
-        .unwrap()
+        .expect("Unable to read the configuration file")
         .as_str(),
     )
-    .unwrap();
+    .expect("Unable to parse the configuration file");
 
-    debug!("{:?}", config);
+    match options.subcmd {
+        Some(SubCommand::CheckConfig) => {
+            info!("Config parsed successfully: \n{:#?}", config);
+            std::process::exit(0);
+        }
+        _ => {
+            debug!("{:?}", config);
+        }
+    }
 
     let mut handles = Vec::new();
 
     for repo in config.clone().repos {
-        let state = UpdateState { cache_dir: cache_dir.clone() };
+        let state = UpdateState {
+            cache_dir: cache_dir.clone(),
+        };
         let settings = config.settings.clone();
 
-        let handle = tokio::spawn(async {
+        let repo_longlived = repo.clone();
+
+        let handle = tokio::spawn(async move {
             match update_repo(repo, state, settings).await {
-                Ok(()) => {},
+                Ok(()) => {}
                 Err(e) => {
-                    warn!("{0}", e);
+                    warn!("{}: {}", repo_longlived, e);
                 }
             }
         });
