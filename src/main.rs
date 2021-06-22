@@ -63,6 +63,8 @@ enum UpdateError {
     SetupUpdateBranchError(#[from] git::SetupUpdateBranchError),
     #[error("Error during flake update: {0}")]
     FlakeUpdateError(#[from] FlakeUpdateError),
+    #[error("Error while making a diff between lockfiles: {0}")]
+    LockDiffError(#[from] flake_lock::LockDiffError),
     #[error("Error during git commit: {0}")]
     CommitError(#[from] git::CommitError),
     #[error("Error during git push: {0}")]
@@ -90,13 +92,13 @@ async fn update_repo(
     let before = flake_lock::get_lock(&workdir.clone())?;
     flake_update(repo.clone())?;
     let after = flake_lock::get_lock(&workdir)?;
-    let diff = before.diff(&after);
+    let diff = before.diff(&after)?;
     if diff.len() > 0 {
-        let diff_default = default_branch_lock.diff(&after);
-        info!("{}:\n{}", handle, diff);
-        commit(settings.clone(), repo.clone(), diff.to_string())?;
+        let diff_default = default_branch_lock.diff(&after)?;
+        info!("{}:\n{}", handle, diff.spaced());
+        commit(settings.clone(), repo.clone(), diff.spaced())?;
         push(settings.clone(), repo.clone())?;
-        submit_or_update_request(settings, handle, diff_default.to_string()).await?;
+        submit_or_update_request(settings, handle, diff_default.markdown()).await?;
     } else {
         info!("{}: Nothing to update", handle);
     }
@@ -135,6 +137,16 @@ struct Config {
     repos: Vec<RepoHandle>,
 }
 
+fn good_panic<E, O>(description: &'static str) -> Box<dyn Fn(E) -> O>
+where
+    E: std::fmt::Display,
+{
+    Box::new(move |err| {
+        error!("{}: {}", description, err.to_string());
+        std::process::exit(1);
+    })
+}
+
 #[tokio::main]
 async fn main() {
     let options: Options = Options::parse();
@@ -146,14 +158,18 @@ async fn main() {
     if let Some(SubCommand::DiffLocks { old, new }) = options.subcmd {
         debug!("old:\n{:#?}", old);
         debug!("new:\n{:#?}", new);
-        let diff = old.diff(&new);
+        let diff = old
+            .diff(&new)
+            .unwrap_or_else(good_panic("Unable to generate a diff"));
         debug!("diff:\n{:#?}", diff);
-        info!("formatted diff:\n{}", diff);
+        println!("{}", diff.spaced());
         std::process::exit(0);
     }
 
     let xdg = BaseDirectories::new().unwrap();
-    let cache_dir = xdg.create_cache_directory("update-daemon").unwrap();
+    let cache_dir = xdg
+        .create_cache_directory("update-daemon")
+        .unwrap_or_else(good_panic("Failed to create a cache directory"));
     let config_file = xdg.find_config_file("update-daemon/config.json");
 
     let config: Config = from_str(
@@ -162,10 +178,10 @@ async fn main() {
                 .config
                 .unwrap_or(config_file.unwrap().to_string_lossy().to_string()),
         )
-        .expect("Unable to read the configuration file")
+        .unwrap_or_else(good_panic("Unable to read the configuration file"))
         .as_str(),
     )
-    .expect("Unable to parse the configuration file");
+    .unwrap_or_else(good_panic("Unable to parse the configuration file"));
 
     match options.subcmd {
         Some(SubCommand::CheckConfig) => {

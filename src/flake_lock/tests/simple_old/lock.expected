@@ -1,0 +1,37 @@
+Lock {
+    nodes: {
+        "nixpkgs": Node {
+            flake: None,
+            locked: Some(
+                Git {
+                    type: "github",
+                    owner: Some(
+                        "nixos",
+                    ),
+                    repo: Some(
+                        "nixpkgs",
+                    ),
+                    rev: "84d74ae9c9cbed73274b8e4e00be14688ffc93fe",
+                    nar_hash: "sha256-G3RUAi2DUq6r3ntASLS+LZC/Eamot55W1+xmBOgEh3M=",
+                    last_modified: Some(
+                        1601171649,
+                    ),
+                },
+            ),
+            inputs: None,
+        },
+        "root": Node {
+            flake: None,
+            locked: None,
+            inputs: Some(
+                {
+                    "nixpkgs": Simple(
+                        "nixpkgs",
+                    ),
+                },
+            ),
+        },
+    },
+    version: 7,
+    root: "root",
+}
