@@ -52,10 +52,7 @@ pub async fn submit_or_update_pull_request(
             .body(diff)
             .send()
             .await?;
-        crab.issues(owner, repo)
-            .update(pr.number)
-            .send()
-            .await?;
+        crab.issues(owner, repo).update(pr.number).send().await?;
         info!("Submitted PR {}", pr.html_url);
     }
 

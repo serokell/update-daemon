@@ -9,7 +9,7 @@ let
   cfg = config.services.update-daemon;
   repos = lib.concatLists (lib.concatLists(lib.mapAttrsFlatten (type:
     lib.mapAttrsFlatten
-    (owner: lib.mapAttrsFlatten (repo: settings: { inherit type owner repo; })))
+    (owner: lib.mapAttrsFlatten (repo: settings: { inherit type owner repo settings; })))
     cfg.repos));
 in {
   options.services.update-daemon = with lib;

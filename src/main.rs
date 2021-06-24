@@ -21,6 +21,10 @@ use types::*;
 mod request;
 use request::submit_or_update_request;
 
+use merge::Merge;
+
+use std::convert::TryInto;
+
 #[derive(Debug, Error)]
 enum FlakeUpdateError {
     #[error("Unable to find a git workdir")]
@@ -46,7 +50,7 @@ fn flake_update<'a>(repo: Arc<Mutex<Repository>>) -> Result<(), FlakeUpdateError
     );
     let status = nix_flake_update.status()?;
 
-    if ! status.success() {
+    if !status.success() {
         return Err(FlakeUpdateError::ExitStatusError(status.code()));
     }
 
@@ -133,17 +137,17 @@ enum SubCommand {
 #[derive(Debug, Clone, Deserialize)]
 struct Config {
     #[serde(flatten)]
-    settings: UpdateSettings,
-    repos: Vec<RepoHandle>,
+    settings: UpdateSettingsOptional,
+    repos: Vec<Repo>,
 }
 
-fn good_panic<E, O>(description: &'static str) -> Box<dyn Fn(E) -> O>
+fn good_panic<E, O>(description: &'static str, code: i32) -> Box<dyn Fn(E) -> O>
 where
     E: std::fmt::Display,
 {
     Box::new(move |err| {
         error!("{}: {}", description, err.to_string());
-        std::process::exit(1);
+        std::process::exit(code);
     })
 }
 
@@ -160,7 +164,7 @@ async fn main() {
         debug!("new:\n{:#?}", new);
         let diff = old
             .diff(&new)
-            .unwrap_or_else(good_panic("Unable to generate a diff"));
+            .unwrap_or_else(good_panic("Unable to generate a diff", 65));
         debug!("diff:\n{:#?}", diff);
         println!("{}", diff.spaced());
         std::process::exit(0);
@@ -169,7 +173,7 @@ async fn main() {
     let xdg = BaseDirectories::new().unwrap();
     let cache_dir = xdg
         .create_cache_directory("update-daemon")
-        .unwrap_or_else(good_panic("Failed to create a cache directory"));
+        .unwrap_or_else(good_panic("Failed to create a cache directory", 77));
     let config_file = xdg.find_config_file("update-daemon/config.json");
 
     let config: Config = from_str(
@@ -179,14 +183,20 @@ async fn main() {
                 .to_string_lossy()
                 .to_string()
         }))
-        .unwrap_or_else(good_panic("Unable to read the configuration file"))
+        .unwrap_or_else(good_panic("Unable to read the configuration file", 66))
         .as_str(),
     )
-    .unwrap_or_else(good_panic("Unable to parse the configuration file"));
+    .unwrap_or_else(good_panic("Unable to parse the configuration file", 78));
 
     match options.subcmd {
         Some(SubCommand::CheckConfig) => {
             info!("Config parsed successfully: \n{:#?}", config);
+            let settings: Result<UpdateSettings, _> = config.settings.try_into();
+            match settings {
+                Err(e) => warn!("The default settings are incomplete, you must complete them for each separate repo: {}", e),
+                Ok(s) => info!("Default settings are complete:\n{:#?}", s)
+            }
+
             std::process::exit(0);
         }
         _ => {
@@ -200,19 +210,37 @@ async fn main() {
         let state = UpdateState {
             cache_dir: cache_dir.clone(),
         };
-        let settings = config.settings.clone();
+
+        let mut settings = repo.clone().settings.unwrap_or(types::UpdateSettingsOptional::default());
+
+        settings.merge(config.clone().settings);
 
         let repo_longlived = repo.clone();
 
         let handle = tokio::spawn(async move {
-            match update_repo(repo, state, settings).await {
-                Ok(()) => {}
+            match settings.try_into() {
                 Err(e) => {
-                    warn!("{}: {}", repo_longlived, e);
+                    error!("{}: {}", repo_longlived.handle, e);
+                    Err(())
+                }
+                Ok(settings) => {
+                    match update_repo(repo.handle, state, settings).await {
+                        Err(e) => {
+                            error!("{}: {}", repo_longlived.handle, e);
+                            Err(())
+                        }
+                        Ok(()) => { Ok(()) }
+                    }
                 }
             }
+
         });
         handles.push(handle);
     }
-    futures::future::join_all(handles).await;
+    if futures::future::join_all(handles).await.iter().all(|res| res.is_ok()) {
+        std::process::exit(0);
+    } else {
+        error!("Errors occured, please see above logs");
+        std::process::exit(1);
+    };
 }
