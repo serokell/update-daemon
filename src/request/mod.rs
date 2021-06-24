@@ -17,10 +17,11 @@ pub async fn submit_or_update_request(
     settings: UpdateSettings,
     handle: RepoHandle,
     diff: String,
+    submit: bool,
 ) -> Result<(), RequestError> {
     match handle {
         RepoHandle::GitHub { owner, repo } => {
-            github::submit_or_update_pull_request(settings, owner, repo, diff).await?;
+            github::submit_or_update_pull_request(settings, owner, repo, diff, submit).await?;
         }
     }
     Ok(())

@@ -20,6 +20,7 @@ pub async fn submit_or_update_pull_request(
     owner: String,
     repo: String,
     diff: String,
+    submit: bool,
 ) -> Result<(), PullRequestError> {
     let crab = octocrab::OctocrabBuilder::new()
         .personal_token(std::env::var("GITHUB_TOKEN")?)
@@ -33,6 +34,8 @@ pub async fn submit_or_update_pull_request(
         .issues_and_pull_requests(query.as_str())
         .send()
         .await?;
+
+    // If there is a PR already, update it and be done
     if let Some(pr) = page.items.pop() {
         crab.issues(owner, repo)
             .update(pr.number as u64)
@@ -41,7 +44,11 @@ pub async fn submit_or_update_pull_request(
             .send()
             .await?;
         info!("Updated PR {}", pr.html_url);
-    } else {
+        return Ok(())
+    }
+
+    // If there isn't, submit only when `submit` is passed
+    if submit {
         let pr = crab
             .pulls(owner.clone(), repo.clone())
             .create(
@@ -56,6 +63,5 @@ pub async fn submit_or_update_pull_request(
         crab.issues(owner, repo).update(pr.number).send().await?;
         info!("Submitted PR {}", pr.html_url);
     }
-
     Ok(())
 }

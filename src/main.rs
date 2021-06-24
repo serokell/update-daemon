@@ -97,17 +97,18 @@ async fn update_repo(
     flake_update(repo.clone())?;
     let after = flake_lock::get_lock(&workdir)?;
     let diff = before.diff(&after)?;
+    let diff_default = default_branch_lock.diff(&after)?;
+    let mut body = diff_default.markdown();
+    body.push('\n');
+    body.push_str(settings.extra_body.as_str());
     if diff.len() > 0 {
-        let diff_default = default_branch_lock.diff(&after)?;
         info!("{}:\n{}", handle, diff.spaced());
         commit(settings.clone(), repo.clone(), diff.spaced())?;
         push(settings.clone(), repo.clone())?;
-        let mut body = diff_default.markdown();
-        body.push('\n');
-        body.push_str(settings.extra_body.as_str());
-        submit_or_update_request(settings, handle, body).await?;
+        submit_or_update_request(settings, handle, body, true).await?;
     } else {
         info!("{}: Nothing to update", handle);
+        submit_or_update_request(settings, handle, body, false).await?;
     }
     Ok(())
 }
