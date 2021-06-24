@@ -15,6 +15,7 @@ pub struct UpdateSettings {
     pub update_branch: String,
     pub default_branch: String,
     pub title: String,
+    pub extra_body: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -29,6 +30,7 @@ pub struct UpdateSettingsOptional {
     pub update_branch: Option<String>,
     pub default_branch: Option<String>,
     pub title: Option<String>,
+    pub extra_body: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -50,9 +52,10 @@ impl std::convert::TryInto<UpdateSettings> for UpdateSettingsOptional {
     fn try_into(self) -> Result<UpdateSettings, Self::Error> {
         Ok(UpdateSettings {
             author: unoption(self.author, "author")?,
-            update_branch: unoption(self.update_branch, "update_branch")?,
-            default_branch: unoption(self.default_branch, "default_branch")?,
-            title: unoption(self.title, "title")?,
+            update_branch: self.update_branch.unwrap_or("automatic-update".to_string()),
+            default_branch: self.default_branch.unwrap_or("master".to_string()),
+            title: self.title.unwrap_or("Automatically update flake.lock".to_string()),
+            extra_body: self.extra_body.unwrap_or(String::new()),
         })
     }
 }

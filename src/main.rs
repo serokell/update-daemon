@@ -102,7 +102,10 @@ async fn update_repo(
         info!("{}:\n{}", handle, diff.spaced());
         commit(settings.clone(), repo.clone(), diff.spaced())?;
         push(settings.clone(), repo.clone())?;
-        submit_or_update_request(settings, handle, diff_default.markdown()).await?;
+        let mut body = diff_default.markdown();
+        body.push('\n');
+        body.push_str(settings.extra_body.as_str());
+        submit_or_update_request(settings, handle, body).await?;
     } else {
         info!("{}: Nothing to update", handle);
     }

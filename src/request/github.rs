@@ -50,6 +50,7 @@ pub async fn submit_or_update_pull_request(
                 settings.default_branch,
             )
             .body(diff)
+            .maintainer_can_modify(true)
             .send()
             .await?;
         crab.issues(owner, repo).update(pr.number).send().await?;
