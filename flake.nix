@@ -4,7 +4,7 @@
 
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs";
+    nixpkgs.url = "github:serokell/nixpkgs";
     crate2nix = {
       url = "github:kolloch/crate2nix";
       flake = false;
@@ -32,6 +32,13 @@
           inherit pkgs;
           defaultCrateOverrides = pkgs.defaultCrateOverrides // {
             # Crate dependency overrides go here
+            update-daemon = oa: {
+              nativeBuildInputs = [ pkgs.makeWrapper ];
+              postInstall =
+                "wrapProgram $out/bin/update-daemon --prefix PATH : ${
+                  pkgs.lib.makeBinPath [ pkgs.nixUnstable pkgs.gitMinimal ]
+                }";
+            };
           };
         };
 

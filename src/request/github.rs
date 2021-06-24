@@ -38,7 +38,6 @@ pub async fn submit_or_update_pull_request(
             .update(pr.number as u64)
             .title(settings.title.as_str())
             .body(&diff)
-            .assignees(settings.assignees.as_slice())
             .send()
             .await?;
         info!("Updated PR {}", pr.html_url);
@@ -55,7 +54,6 @@ pub async fn submit_or_update_pull_request(
             .await?;
         crab.issues(owner, repo)
             .update(pr.number)
-            .assignees(settings.assignees.as_slice())
             .send()
             .await?;
         info!("Submitted PR {}", pr.html_url);

@@ -8,12 +8,17 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct UpdateSettings {
-    pub author_email: String,
-    pub author_name: String,
+    pub author: Author,
     pub update_branch: String,
     pub default_branch: String,
     pub assignees: Vec<String>,
     pub title: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Author {
+    pub name: String,
+    pub email: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

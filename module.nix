@@ -7,10 +7,10 @@ self:
 { pkgs, lib, config, ... }:
 let
   cfg = config.services.update-daemon;
-  repos = lib.concatLists (lib.mapAttrsFlatten (type:
+  repos = lib.concatLists (lib.concatLists(lib.mapAttrsFlatten (type:
     lib.mapAttrsFlatten
     (owner: lib.mapAttrsFlatten (repo: settings: { inherit type owner repo; })))
-    cfg.repos);
+    cfg.repos));
 in {
   options.services.update-daemon = with lib;
     with types; {
@@ -70,11 +70,6 @@ in {
           description =
             "The branch to base the update on and submit the pull request for";
           default = "master";
-        };
-        assignees = mkOption {
-          type = listOf str;
-          description = "People to assign to the GitHub pull request";
-          default = [ ];
         };
         title = mkOption {
           type = str;

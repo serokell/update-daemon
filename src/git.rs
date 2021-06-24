@@ -43,8 +43,8 @@ fn make_signature<'a>(settings: UpdateSettings) -> Result<Signature<'a>, AuthorE
         0,
     );
     let author = Signature::new(
-        settings.author_name.as_str(),
-        settings.author_email.as_str(),
+        settings.author.clone().name.as_str(),
+        settings.author.email.as_str(),
         &now,
     )?;
     Ok(author)

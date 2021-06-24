@@ -25,13 +25,13 @@ use request::submit_or_update_request;
 enum FlakeUpdateError {
     #[error("Unable to find a git workdir")]
     GitError,
-    #[error("Command exited with a non-zero exit status")]
-    ExitStatusError(#[from] std::io::Error),
-    #[error("Error while decoding output")]
-    OutputDecodeError(#[from] std::str::Utf8Error),
+    #[error("Error while running the command: {0}")]
+    CommandError(#[from] std::io::Error),
+    #[error("Command was terminated or exited with a non-zero status: {0:?}")]
+    ExitStatusError(Option<i32>),
 }
 
-fn flake_update<'a>(repo: Arc<Mutex<Repository>>) -> Result<String, FlakeUpdateError> {
+fn flake_update<'a>(repo: Arc<Mutex<Repository>>) -> Result<(), FlakeUpdateError> {
     let mut nix_flake_update = Command::new("nix");
     nix_flake_update.arg("flake");
     nix_flake_update.arg("update");
@@ -44,13 +44,13 @@ fn flake_update<'a>(repo: Arc<Mutex<Repository>>) -> Result<String, FlakeUpdateE
             .to_str()
             .unwrap(),
     );
-    let output = nix_flake_update.output()?;
+    let status = nix_flake_update.status()?;
 
-    let output = std::str::from_utf8(&output.stderr)?;
+    if ! status.success() {
+        return Err(FlakeUpdateError::ExitStatusError(status.code()));
+    }
 
-    let lines: Vec<&str> = output.split("\n").skip(1).collect();
-
-    Ok(lines.join("\n"))
+    Ok(())
 }
 
 #[derive(Debug, Error)]
@@ -173,11 +173,12 @@ async fn main() {
     let config_file = xdg.find_config_file("update-daemon/config.json");
 
     let config: Config = from_str(
-        std::fs::read_to_string(
-            options
-                .config
-                .unwrap_or(config_file.unwrap().to_string_lossy().to_string()),
-        )
+        std::fs::read_to_string(options.config.unwrap_or_else(|| {
+            config_file
+                .expect("Unable to find a configuration file")
+                .to_string_lossy()
+                .to_string()
+        }))
         .unwrap_or_else(good_panic("Unable to read the configuration file"))
         .as_str(),
     )
