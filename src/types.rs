@@ -4,10 +4,10 @@
 
 use merge::Merge;
 use serde::Deserialize;
+use std::default::Default;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use thiserror::Error;
-use std::default::Default;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct UpdateSettings {
@@ -54,7 +54,9 @@ impl std::convert::TryInto<UpdateSettings> for UpdateSettingsOptional {
             author: unoption(self.author, "author")?,
             update_branch: self.update_branch.unwrap_or("automatic-update".to_string()),
             default_branch: self.default_branch.unwrap_or("master".to_string()),
-            title: self.title.unwrap_or("Automatically update flake.lock".to_string()),
+            title: self
+                .title
+                .unwrap_or("Automatically update flake.lock".to_string()),
             extra_body: self.extra_body.unwrap_or(String::new()),
         })
     }
@@ -69,7 +71,7 @@ pub struct UpdateState {
 #[serde(tag = "type")]
 pub enum RepoHandle {
     #[serde(rename = "github")]
-    GitHub { owner: String, repo: String, },
+    GitHub { owner: String, repo: String },
 }
 
 #[derive(Debug, Clone, Deserialize)]

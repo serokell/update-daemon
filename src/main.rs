@@ -214,7 +214,10 @@ async fn main() {
             cache_dir: cache_dir.clone(),
         };
 
-        let mut settings = repo.clone().settings.unwrap_or(types::UpdateSettingsOptional::default());
+        let mut settings = repo
+            .clone()
+            .settings
+            .unwrap_or(types::UpdateSettingsOptional::default());
 
         settings.merge(config.clone().settings);
 
@@ -226,21 +229,25 @@ async fn main() {
                     error!("{}: {}", repo_longlived.handle, e);
                     Err(())
                 }
-                Ok(settings) => {
-                    match update_repo(repo.handle, state, settings).await {
-                        Err(e) => {
-                            error!("{}: {}", repo_longlived.handle, e);
-                            Err(())
-                        }
-                        Ok(()) => { Ok(()) }
+                Ok(settings) => match update_repo(repo.handle, state, settings).await {
+                    Err(e) => {
+                        error!("{}: {}", repo_longlived.handle, e);
+                        Err(())
                     }
-                }
+                    Ok(()) => Ok(()),
+                },
             }
-
         });
         handles.push(handle);
     }
-    if futures::future::join_all(handles).await.iter().all(|res| res.is_ok()) {
+    if futures::future::join_all(handles)
+        .await
+        .iter()
+        .all(|res| match res {
+            Ok(r) if r.is_ok() => true,
+            _ => false,
+        })
+    {
         std::process::exit(0);
     } else {
         error!("Errors occured, please see above logs");
