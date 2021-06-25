@@ -44,7 +44,7 @@ pub async fn submit_or_update_pull_request(
             .send()
             .await?;
         info!("Updated PR {}", pr.html_url);
-        return Ok(())
+        return Ok(());
     }
 
     // If there isn't, submit only when `submit` is passed
