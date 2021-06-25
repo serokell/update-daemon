@@ -90,6 +90,13 @@ pub fn init_repo(
             .fetch(&[&default_branch_name], Some(&mut fetch_options), None)
             .map_err(InitError::Fetch)?;
 
+
+        repo.find_remote("origin")
+            .map_err(InitError::FindRemote)?
+            .fetch(&[&update_branch_name], Some(&mut fetch_options), None)
+            .map_err(InitError::Fetch)?;
+
+
         repo
     } else {
         debug!("Cloning {} to {:?}", handle, repo_dir);
