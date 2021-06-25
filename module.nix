@@ -78,7 +78,7 @@ in {
         };
         extra_body = mkOption {
           type = lines;
-          decription = "Extra lines to add to pull request body";
+          description = "Extra lines to add to pull request body";
           default = "";
         };
       };
