@@ -76,6 +76,11 @@ in {
           description = "GitHub pull request title";
           default = "Automatically update flake.lock to the latest version";
         };
+        extra_body = mkOption {
+          type = lines;
+          decription = "Extra lines to add to pull request body";
+          default = "";
+        };
       };
     };
   config = lib.mkIf cfg.enable {
