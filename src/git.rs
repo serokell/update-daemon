@@ -7,7 +7,7 @@ use git2::{BranchType, FetchOptions, PushOptions, Repository, ResetType, Signatu
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{create_dir, remove_dir_all};
 use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use log::*;
@@ -20,6 +20,41 @@ fn calculate_hash<H: Hash>(url: H) -> String {
     let mut hasher = DefaultHasher::new();
     url.hash(&mut hasher);
     format!("{}", hasher.finish())
+}
+
+pub struct UDRepo {
+    repo: Repository,
+}
+
+impl UDRepo {
+    pub fn init(
+        state: UpdateState,
+        settings: UpdateSettings,
+        handle: RepoHandle,
+    ) -> Result<UDRepo, InitError> {
+        Ok(UDRepo {
+            repo: init_repo(state, settings, handle)?,
+        })
+    }
+
+    pub fn path(&self) -> Option<&Path> {
+        self.repo.workdir()
+    }
+
+    pub fn setup_update_branch(
+        &self,
+        settings: UpdateSettings,
+    ) -> Result<(), SetupUpdateBranchError> {
+        Ok(setup_update_branch(settings, &self.repo)?)
+    }
+
+    pub fn commit(&self, settings: UpdateSettings, diff: String) -> Result<(), CommitError> {
+        Ok(commit(settings, &self.repo, diff)?)
+    }
+
+    pub fn push(&self, settings: UpdateSettings) -> Result<(), PushError> {
+        Ok(push(settings, &self.repo)?)
+    }
 }
 
 #[derive(Debug, Error)]

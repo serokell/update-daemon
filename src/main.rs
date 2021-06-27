@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use git2::Repository;
+use std::path::Path;
 
 use std::process::Command;
 use xdg::BaseDirectories;
@@ -16,7 +16,7 @@ use serde::Deserialize;
 use serde_json::from_str;
 
 mod git;
-use git::*;
+use git::UDRepo;
 mod flake_lock;
 mod types;
 use types::*;
@@ -29,25 +29,18 @@ use std::convert::TryInto;
 
 #[derive(Debug, Error)]
 enum FlakeUpdateError {
-    #[error("Unable to find a git workdir")]
-    GitError,
     #[error("Error while running the command: {0}")]
     CommandError(#[from] std::io::Error),
     #[error("Command was terminated or exited with a non-zero status: {0:?}")]
     ExitStatusError(Option<i32>),
 }
 
-fn flake_update<'a>(repo: &Repository) -> Result<(), FlakeUpdateError> {
+fn flake_update<'a>(workdir: &Path) -> Result<(), FlakeUpdateError> {
     let mut nix_flake_update = Command::new("nix");
     nix_flake_update.arg("flake");
     nix_flake_update.arg("update");
     nix_flake_update.arg("--no-warn-dirty");
-    nix_flake_update.current_dir(
-        repo.workdir()
-            .ok_or(FlakeUpdateError::GitError)?
-            .to_str()
-            .unwrap(),
-    );
+    nix_flake_update.current_dir(workdir.to_str().unwrap());
     let status = nix_flake_update.status()?;
 
     if !status.success() {
@@ -83,22 +76,31 @@ async fn update_repo(
     settings: UpdateSettings,
 ) -> Result<(), UpdateError> {
     info!("Updating {}", handle);
-    let repo = init_repo(state, settings.clone(), handle.clone())?;
-    let workdir = repo.workdir().unwrap().to_path_buf();
+
+    let repo = UDRepo::init(state, settings.clone(), handle.clone())?;
+    let workdir = repo.path().unwrap();
+
     let default_branch_lock = flake_lock::get_lock(&workdir.clone())?;
-    setup_update_branch(settings.clone(), &repo)?;
+
+    repo.setup_update_branch(settings.clone())?;
+
     let before = flake_lock::get_lock(&workdir.clone())?;
-    flake_update(&repo)?;
+
+    flake_update(workdir)?;
+
     let after = flake_lock::get_lock(&workdir)?;
+
     let diff = before.diff(&after)?;
     let diff_default = default_branch_lock.diff(&after)?;
+
     let mut body = diff_default.markdown();
     body.push('\n');
     body.push_str(settings.extra_body.as_str());
+
     if diff.len() > 0 {
         info!("{}:\n{}", handle, diff.spaced());
-        commit(settings.clone(), &repo, diff.spaced())?;
-        push(settings.clone(), &repo)?;
+        repo.commit(settings.clone(), diff.spaced())?;
+        repo.push(settings.clone())?;
         submit_or_update_request(settings, handle, body, true).await?;
     } else {
         info!("{}: Nothing to update", handle);
