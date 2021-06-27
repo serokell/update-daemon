@@ -3,15 +3,11 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use git2::RemoteCallbacks;
-pub use git2::{
-    BranchType, FetchOptions, ObjectType, PushOptions, Repository, ResetType, Signature,
-};
+use git2::{BranchType, FetchOptions, PushOptions, Repository, ResetType, Signature};
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{create_dir, remove_dir_all};
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
-pub use std::sync::Arc;
-pub use std::sync::Mutex;
 use thiserror::Error;
 
 use log::*;

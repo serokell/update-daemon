@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use git2::Repository;
+
 use std::process::Command;
 use xdg::BaseDirectories;
 
