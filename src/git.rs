@@ -30,8 +30,10 @@ pub enum InitError {
     SetRemoteUrl(git2::Error),
     #[error("Error finding remote for existing repository: {0}")]
     FindRemote(git2::Error),
-    #[error("Error fetching for existing repository: {0}")]
-    Fetch(git2::Error),
+    #[error("Error fetching default branch for existing repository: {0}")]
+    FetchDefault(git2::Error),
+    #[error("Error fetching update branch for existing repository: {0}")]
+    FetchUpdate(git2::Error),
     #[error("Error creating directory for cloning: {0}")]
     CreateCloneDir(std::io::Error),
     #[error("Error cleaning up after failed clone: {0}")]
@@ -63,9 +65,6 @@ pub fn init_repo(
     let mut repo_dir = PathBuf::from(state.cache_dir);
     repo_dir.push(urlhash);
 
-    let default_branch_name = settings.default_branch;
-    let update_branch_name = settings.update_branch;
-
     let mut callbacks = RemoteCallbacks::new();
     callbacks
         .credentials(|_url, username, _| git2::Cred::ssh_key_from_agent(username.unwrap_or("git")));
@@ -78,18 +77,18 @@ pub fn init_repo(
 
         let repo = Repository::open(repo_dir).map_err(InitError::OpenRepository)?;
 
-        repo.remote_set_url("origin", url.as_str())
+        repo.remote_set_url("origin", &url)
             .map_err(InitError::SetRemoteUrl)?;
 
         repo.find_remote("origin")
             .map_err(InitError::FindRemote)?
-            .fetch(&[&default_branch_name], Some(&mut fetch_options), None)
-            .map_err(InitError::Fetch)?;
+            .fetch(&[&settings.default_branch], Some(&mut fetch_options), None)
+            .map_err(InitError::FetchDefault)?;
 
         repo.find_remote("origin")
             .map_err(InitError::FindRemote)?
-            .fetch(&[&update_branch_name], Some(&mut fetch_options), None)
-            .map_err(InitError::Fetch)?;
+            .fetch(&[&settings.update_branch], Some(&mut fetch_options), None)
+            .map_err(InitError::FetchUpdate)?;
 
         repo
     } else {
@@ -99,7 +98,7 @@ pub fn init_repo(
 
         let mut builder = git2::build::RepoBuilder::new();
         builder.fetch_options(fetch_options);
-        match builder.clone(url.as_str(), &repo_dir) {
+        match builder.clone(&url, &repo_dir) {
             Ok(repo) => repo,
             Err(e) => {
                 remove_dir_all(repo_dir).map_err(InitError::CleanFailedClone)?;
@@ -111,7 +110,7 @@ pub fn init_repo(
     {
         let default_branch_commit = repo
             .find_branch(
-                format!("origin/{}", &default_branch_name).as_str(),
+                &format!("origin/{}", &settings.default_branch),
                 BranchType::Remote,
             )
             .map_err(InitError::FindDefaultBranch)?
@@ -166,15 +165,14 @@ pub fn setup_update_branch(
     settings: UpdateSettings,
     repo: &Repository,
 ) -> Result<(), SetupUpdateBranchError> {
-    let default_branch_name = settings.default_branch;
-    let update_branch_name = settings.update_branch;
     let update_branch = repo.find_branch(
-        format!("origin/{}", update_branch_name).as_str(),
+        &format!("origin/{}", settings.update_branch),
         BranchType::Remote,
     );
+
     let default_branch_commit = repo
         .find_branch(
-            format!("origin/{}", &default_branch_name).as_str(),
+            &format!("origin/{}", &settings.default_branch),
             BranchType::Remote,
         )
         .map_err(SetupUpdateBranchError::FindDefaultBranch)?
@@ -185,12 +183,12 @@ pub fn setup_update_branch(
     match update_branch {
         Err(_) => {
             // TODO: handle errors we care about here?
-            repo.branch(&update_branch_name, &default_branch_commit, true)
+            repo.branch(&settings.update_branch, &default_branch_commit, true)
                 .map_err(SetupUpdateBranchError::BranchToUpdateBranchWithDefault)?;
         }
         Ok(remote_update_branch) => {
             repo.branch(
-                &update_branch_name,
+                &settings.update_branch,
                 &remote_update_branch
                     .into_reference()
                     .peel_to_commit()
@@ -200,7 +198,7 @@ pub fn setup_update_branch(
             .map_err(SetupUpdateBranchError::BranchToUpdateBranchWithRemoteBranch)?;
 
             let local_update_branch = repo
-                .find_branch(&update_branch_name, BranchType::Local)
+                .find_branch(&settings.update_branch, BranchType::Local)
                 .map_err(SetupUpdateBranchError::FindUpdateBranch)?;
 
             let update_branch_commit = local_update_branch
@@ -241,7 +239,7 @@ pub fn setup_update_branch(
                 .map_err(SetupUpdateBranchError::FinishRebase)?;
         }
     };
-    repo.set_head(format!("refs/heads/{}", update_branch_name).as_str())
+    repo.set_head(&format!("refs/heads/{}", settings.update_branch))
         .map_err(SetupUpdateBranchError::SetUpdateBranchHead)?;
     Ok(())
 }
@@ -299,7 +297,7 @@ pub fn commit(
         Some("HEAD"),
         &author,
         &author,
-        format!("{}\n\n{}", settings.title, diff).as_str(),
+        &format!("{}\n\n{}", settings.title, diff),
         &tree,
         &[parent],
     )
@@ -329,7 +327,10 @@ pub fn push(settings: UpdateSettings, repo: &Repository) -> Result<(), PushError
     remote
         .push(
             //         ↓ force-push
-            &[format!("+refs/heads/{0}:refs/heads/{0}", settings.update_branch).as_str()],
+            &[&format!(
+                "+refs/heads/{0}:refs/heads/{0}",
+                settings.update_branch
+            )],
             Some(&mut push_options),
         )
         .map_err(PushError::Push)?;
