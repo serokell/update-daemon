@@ -61,7 +61,7 @@ pub fn init_repo(
     state: UpdateState,
     settings: UpdateSettings,
     handle: RepoHandle,
-) -> Result<Arc<Mutex<Repository>>, InitError> {
+) -> Result<Repository, InitError> {
     let url = handle.to_string();
     let urlhash = calculate_hash(&url);
     let mut repo_dir = PathBuf::from(state.cache_dir);
@@ -77,7 +77,7 @@ pub fn init_repo(
     let mut fetch_options = FetchOptions::new();
     fetch_options.remote_callbacks(callbacks);
 
-    let repo_cell = Arc::new(Mutex::new(if repo_dir.exists() {
+    let repo = if repo_dir.exists() {
         debug!("Repository {} found at {:?}", handle, repo_dir);
 
         let repo = Repository::open(repo_dir).map_err(InitError::OpenRepository)?;
@@ -90,12 +90,10 @@ pub fn init_repo(
             .fetch(&[&default_branch_name], Some(&mut fetch_options), None)
             .map_err(InitError::Fetch)?;
 
-
         repo.find_remote("origin")
             .map_err(InitError::FindRemote)?
             .fetch(&[&update_branch_name], Some(&mut fetch_options), None)
             .map_err(InitError::Fetch)?;
-
 
         repo
     } else {
@@ -112,11 +110,9 @@ pub fn init_repo(
                 return Err(InitError::Clone(e));
             }
         }
-    }));
+    };
 
     {
-        let repo = repo_cell.lock().unwrap();
-
         let default_branch_commit = repo
             .find_branch(
                 format!("origin/{}", &default_branch_name).as_str(),
@@ -131,7 +127,7 @@ pub fn init_repo(
             .map_err(InitError::ResetToDefaultBranchCommit)?;
     }
 
-    Ok(repo_cell)
+    Ok(repo)
 }
 
 #[derive(Debug, Error)]
@@ -172,9 +168,8 @@ pub enum SetupUpdateBranchError {
 
 pub fn setup_update_branch(
     settings: UpdateSettings,
-    repo_cell: Arc<Mutex<Repository>>,
+    repo: &Repository,
 ) -> Result<(), SetupUpdateBranchError> {
-    let repo = repo_cell.lock().unwrap();
     let default_branch_name = settings.default_branch;
     let update_branch_name = settings.update_branch;
     let update_branch = repo.find_branch(
@@ -281,10 +276,9 @@ pub enum CommitError {
 /// `diff` is going to be the commit message.
 pub fn commit(
     settings: UpdateSettings,
-    repo: Arc<Mutex<Repository>>,
+    repo: &Repository,
     diff: String,
 ) -> Result<(), CommitError> {
-    let repo = repo.lock().unwrap();
     let mut index = repo.index().map_err(CommitError::Index)?;
 
     index
@@ -327,9 +321,7 @@ pub enum PushError {
 }
 
 /// Push the changes to the `origin` remote.
-pub fn push(settings: UpdateSettings, repo: Arc<Mutex<Repository>>) -> Result<(), PushError> {
-    let repo = repo.lock().unwrap();
-
+pub fn push(settings: UpdateSettings, repo: &Repository) -> Result<(), PushError> {
     let mut remote = repo.find_remote("origin").map_err(PushError::FindRemote)?;
 
     let mut callbacks = RemoteCallbacks::new();

@@ -35,15 +35,13 @@ enum FlakeUpdateError {
     ExitStatusError(Option<i32>),
 }
 
-fn flake_update<'a>(repo: Arc<Mutex<Repository>>) -> Result<(), FlakeUpdateError> {
+fn flake_update<'a>(repo: &Repository) -> Result<(), FlakeUpdateError> {
     let mut nix_flake_update = Command::new("nix");
     nix_flake_update.arg("flake");
     nix_flake_update.arg("update");
     nix_flake_update.arg("--no-warn-dirty");
     nix_flake_update.current_dir(
-        repo.lock()
-            .unwrap()
-            .workdir()
+        repo.workdir()
             .ok_or(FlakeUpdateError::GitError)?
             .to_str()
             .unwrap(),
@@ -84,17 +82,11 @@ async fn update_repo(
 ) -> Result<(), UpdateError> {
     info!("Updating {}", handle);
     let repo = init_repo(state, settings.clone(), handle.clone())?;
-    let workdir = repo
-        .clone()
-        .lock()
-        .unwrap()
-        .workdir()
-        .unwrap()
-        .to_path_buf();
+    let workdir = repo.workdir().unwrap().to_path_buf();
     let default_branch_lock = flake_lock::get_lock(&workdir.clone())?;
-    setup_update_branch(settings.clone(), repo.clone())?;
+    setup_update_branch(settings.clone(), &repo)?;
     let before = flake_lock::get_lock(&workdir.clone())?;
-    flake_update(repo.clone())?;
+    flake_update(&repo)?;
     let after = flake_lock::get_lock(&workdir)?;
     let diff = before.diff(&after)?;
     let diff_default = default_branch_lock.diff(&after)?;
@@ -103,8 +95,8 @@ async fn update_repo(
     body.push_str(settings.extra_body.as_str());
     if diff.len() > 0 {
         info!("{}:\n{}", handle, diff.spaced());
-        commit(settings.clone(), repo.clone(), diff.spaced())?;
-        push(settings.clone(), repo.clone())?;
+        commit(settings.clone(), &repo, diff.spaced())?;
+        push(settings.clone(), &repo)?;
         submit_or_update_request(settings, handle, body, true).await?;
     } else {
         info!("{}: Nothing to update", handle);
