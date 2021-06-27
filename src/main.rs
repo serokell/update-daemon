@@ -77,14 +77,14 @@ async fn update_repo(
 ) -> Result<(), UpdateError> {
     info!("Updating {}", handle);
 
-    let repo = UDRepo::init(state, settings.clone(), handle.clone())?;
+    let repo = UDRepo::init(state, &settings, &handle)?;
     let workdir = repo.path().unwrap();
 
-    let default_branch_lock = flake_lock::get_lock(&workdir.clone())?;
+    let default_branch_lock = flake_lock::get_lock(&workdir)?;
 
-    repo.setup_update_branch(settings.clone())?;
+    repo.setup_update_branch(&settings)?;
 
-    let before = flake_lock::get_lock(&workdir.clone())?;
+    let before = flake_lock::get_lock(&workdir)?;
 
     flake_update(workdir)?;
 
@@ -99,8 +99,8 @@ async fn update_repo(
 
     if diff.len() > 0 {
         info!("{}:\n{}", handle, diff.spaced());
-        repo.commit(settings.clone(), diff.spaced())?;
-        repo.push(settings.clone())?;
+        repo.commit(&settings, diff.spaced())?;
+        repo.push(&settings)?;
         submit_or_update_request(settings, handle, body, true).await?;
     } else {
         info!("{}: Nothing to update", handle);

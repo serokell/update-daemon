@@ -29,8 +29,8 @@ pub struct UDRepo {
 impl UDRepo {
     pub fn init(
         state: UpdateState,
-        settings: UpdateSettings,
-        handle: RepoHandle,
+        settings: &UpdateSettings,
+        handle: &RepoHandle,
     ) -> Result<UDRepo, InitError> {
         Ok(UDRepo {
             repo: init_repo(state, settings, handle)?,
@@ -43,16 +43,16 @@ impl UDRepo {
 
     pub fn setup_update_branch(
         &self,
-        settings: UpdateSettings,
+        settings: &UpdateSettings,
     ) -> Result<(), SetupUpdateBranchError> {
         Ok(setup_update_branch(settings, &self.repo)?)
     }
 
-    pub fn commit(&self, settings: UpdateSettings, diff: String) -> Result<(), CommitError> {
+    pub fn commit(&self, settings: &UpdateSettings, diff: String) -> Result<(), CommitError> {
         Ok(commit(settings, &self.repo, diff)?)
     }
 
-    pub fn push(&self, settings: UpdateSettings) -> Result<(), PushError> {
+    pub fn push(&self, settings: &UpdateSettings) -> Result<(), PushError> {
         Ok(push(settings, &self.repo)?)
     }
 }
@@ -92,8 +92,8 @@ pub enum InitError {
 /// Finally, check out the update branch.
 pub fn init_repo(
     state: UpdateState,
-    settings: UpdateSettings,
-    handle: RepoHandle,
+    settings: &UpdateSettings,
+    handle: &RepoHandle,
 ) -> Result<Repository, InitError> {
     let url = handle.to_string();
     let urlhash = calculate_hash(&url);
@@ -197,7 +197,7 @@ pub enum SetupUpdateBranchError {
 }
 
 pub fn setup_update_branch(
-    settings: UpdateSettings,
+    settings: &UpdateSettings,
     repo: &Repository,
 ) -> Result<(), SetupUpdateBranchError> {
     let update_branch = repo.find_branch(
@@ -304,7 +304,7 @@ pub enum CommitError {
 /// Stage all changed files and add them to index.
 /// `diff` is going to be the commit message.
 pub fn commit(
-    settings: UpdateSettings,
+    settings: &UpdateSettings,
     repo: &Repository,
     diff: String,
 ) -> Result<(), CommitError> {
@@ -350,7 +350,7 @@ pub enum PushError {
 }
 
 /// Push the changes to the `origin` remote.
-pub fn push(settings: UpdateSettings, repo: &Repository) -> Result<(), PushError> {
+pub fn push(settings: &UpdateSettings, repo: &Repository) -> Result<(), PushError> {
     let mut remote = repo.find_remote("origin").map_err(PushError::FindRemote)?;
 
     let mut callbacks = RemoteCallbacks::new();
