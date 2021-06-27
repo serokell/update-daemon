@@ -169,7 +169,7 @@ pub fn setup_update_branch(
     let default_branch_name = settings.default_branch;
     let update_branch_name = settings.update_branch;
     let update_branch = repo.find_branch(
-        format!("origin/{}", update_branch_name.clone()).as_str(),
+        format!("origin/{}", update_branch_name).as_str(),
         BranchType::Remote,
     );
     let default_branch_commit = repo
