@@ -104,7 +104,10 @@ async fn update_repo(
         submit_or_update_request(settings, handle, body, true).await?;
     } else {
         info!("{}: Nothing to update", handle);
-        submit_or_update_request(settings, handle, body, false).await?;
+        if diff_default.len() > 0 {
+            repo.push(&settings)?;
+            submit_or_update_request(settings, handle, body, true).await?;
+        }
     }
     Ok(())
 }

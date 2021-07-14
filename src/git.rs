@@ -79,6 +79,8 @@ pub enum InitError {
     FindDefaultBranch(git2::Error),
     #[error("Error peeling to default branch commit: {0}")]
     PeelDefaultBranchCommit(git2::Error),
+    #[error("Error setting HEAD the default branch: {0}")]
+    SetHeadToDefaultBranch(git2::Error),
     #[error("Error resetting to default branch commit: {0}")]
     ResetToDefaultBranchCommit(git2::Error),
 }
@@ -155,6 +157,9 @@ pub fn init_repo(
 
         repo.reset(default_branch_commit.as_object(), ResetType::Hard, None)
             .map_err(InitError::ResetToDefaultBranchCommit)?;
+
+        repo.set_head(format!("refs/heads/{}", settings.default_branch).as_str())
+            .map_err(InitError::SetHeadToDefaultBranch)?;
     }
 
     Ok(repo)
