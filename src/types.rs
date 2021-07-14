@@ -1,0 +1,93 @@
+// SPDX-FileCopyrightText: 2021 Serokell <https://serokell.io>
+//
+// SPDX-License-Identifier: MPL-2.0
+
+use merge::Merge;
+use serde::Deserialize;
+use std::default::Default;
+use std::fmt::{Display, Formatter};
+use std::path::PathBuf;
+use thiserror::Error;
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateSettings {
+    pub author: Author,
+    pub update_branch: String,
+    pub default_branch: String,
+    pub title: String,
+    pub extra_body: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Author {
+    pub name: String,
+    pub email: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Default, Merge)]
+pub struct UpdateSettingsOptional {
+    pub author: Option<Author>,
+    pub update_branch: Option<String>,
+    pub default_branch: Option<String>,
+    pub title: Option<String>,
+    pub extra_body: Option<String>,
+}
+
+#[derive(Debug, Error)]
+pub struct UpdateSettingsMissingField(String);
+
+impl std::fmt::Display for UpdateSettingsMissingField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "Settings missing field {}", self.0)
+    }
+}
+
+fn unoption<T>(opt: Option<T>, name: &'static str) -> Result<T, UpdateSettingsMissingField> {
+    opt.ok_or(UpdateSettingsMissingField(name.to_string()))
+}
+
+impl std::convert::TryInto<UpdateSettings> for UpdateSettingsOptional {
+    type Error = UpdateSettingsMissingField;
+
+    fn try_into(self) -> Result<UpdateSettings, Self::Error> {
+        Ok(UpdateSettings {
+            author: unoption(self.author, "author")?,
+            update_branch: self.update_branch.unwrap_or("automatic-update".to_string()),
+            default_branch: self.default_branch.unwrap_or("master".to_string()),
+            title: self
+                .title
+                .unwrap_or("Automatically update flake.lock".to_string()),
+            extra_body: self.extra_body.unwrap_or(String::new()),
+        })
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpdateState {
+    pub cache_dir: PathBuf,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type")]
+pub enum RepoHandle {
+    #[serde(rename = "github")]
+    GitHub { owner: String, repo: String },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Repo {
+    pub settings: Option<UpdateSettingsOptional>,
+    #[serde(flatten)]
+    pub handle: RepoHandle,
+}
+
+impl Display for RepoHandle {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+        match self {
+            RepoHandle::GitHub { owner, repo, .. } => {
+                write!(f, "ssh://git@github.com/{}/{}", owner, repo)?;
+            }
+        };
+        Ok(())
+    }
+}

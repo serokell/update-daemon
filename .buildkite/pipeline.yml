@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2020 Serokell <https://serokell.io/>
+#
+# SPDX-License-Identifier: MPL-2.0
+
+steps:
+  - label: Check Nix flake
+    commands:
+      - nix-shell --run 'nix --experimental-features "nix-command flakes" flake check -L'
+  - label: Check that the executable builds
+    commands:
+      - nix-build
