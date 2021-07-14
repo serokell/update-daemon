@@ -11,9 +11,8 @@
         "type": "github"
       },
       "original": {
-        "owner": "kolloch",
-        "repo": "crate2nix",
-        "type": "github"
+        "id": "crate2nix",
+        "type": "indirect"
       }
     },
     "flake-compat": {
@@ -27,9 +26,8 @@
         "type": "github"
       },
       "original": {
-        "owner": "edolstra",
-        "repo": "flake-compat",
-        "type": "github"
+        "id": "flake-compat",
+        "type": "indirect"
       }
     },
     "flake-utils": {
@@ -42,12 +40,61 @@
         "type": "github"
       },
       "original": {
-        "owner": "numtide",
-        "repo": "flake-utils",
+        "id": "flake-utils",
+        "type": "indirect"
+      }
+    },
+    "lowdown-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1617481909,
+        "narHash": "sha256-SqnfOFuLuVRRNeVJr1yeEPJue/qWoCp5N6o5Kr///p4=",
+        "owner": "kristapsdz",
+        "repo": "lowdown",
+        "rev": "148f9b2f586c41b7e36e73009db43ea68c7a1a4d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kristapsdz",
+        "ref": "VERSION_0_8_4",
+        "repo": "lowdown",
         "type": "github"
       }
     },
+    "nix": {
+      "inputs": {
+        "lowdown-src": "lowdown-src",
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1626211675,
+        "narHash": "sha256-4a1rH5N7IQF61QG7SoS8bYKec9X1z7IcF0f3Tcc0eHw=",
+        "owner": "NixOS",
+        "repo": "nix",
+        "rev": "bee71d692a10c9fcdc78f589945b9710f676cefb",
+        "type": "github"
+      },
+      "original": {
+        "id": "nix",
+        "type": "indirect"
+      }
+    },
     "nixpkgs": {
+      "locked": {
+        "lastModified": 1624862269,
+        "narHash": "sha256-JFcsh2+7QtfKdJFoPibLFPLgIW6Ycnv8Bts9a7RYme0=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "f77036342e2b690c61c97202bf48f2ce13acc022",
+        "type": "github"
+      },
+      "original": {
+        "id": "nixpkgs",
+        "ref": "nixos-21.05-small",
+        "type": "indirect"
+      }
+    },
+    "nixpkgs_2": {
       "locked": {
         "lastModified": 1622223326,
         "narHash": "sha256-kVb9eGqc+JLENFcctmPyQml1y0xZqvBnykT5niwy/js=",
@@ -57,9 +104,8 @@
         "type": "github"
       },
       "original": {
-        "owner": "serokell",
-        "repo": "nixpkgs",
-        "type": "github"
+        "id": "nixpkgs",
+        "type": "indirect"
       }
     },
     "root": {
@@ -67,7 +113,8 @@
         "crate2nix": "crate2nix",
         "flake-compat": "flake-compat",
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs"
+        "nix": "nix",
+        "nixpkgs": "nixpkgs_2"
       }
     }
   },

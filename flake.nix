@@ -3,24 +3,23 @@
 # SPDX-License-Identifier: MPL-2.0
 
 {
-  inputs = {
-    nixpkgs.url = "github:serokell/nixpkgs";
-    crate2nix = {
-      url = "github:kolloch/crate2nix";
-      flake = false;
-    };
-    flake-utils.url = "github:numtide/flake-utils";
-    flake-compat = {
-      url = "github:edolstra/flake-compat";
-      flake = false;
-    };
+
+  nixConfig = {
+    flake-registry = "https://github.com/serokell/flake-registry/raw/master/flake-registry.json";
   };
 
-  outputs = { self, nixpkgs, crate2nix, flake-utils, ... }:
+  inputs = {
+    crate2nix.flake = false;
+    flake-compat.flake = false;
+  };
+
+  outputs = { self, nixpkgs, crate2nix, flake-utils, nix, flake-compat }:
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         crateName = "update-daemon";
+
+        nix' = nix.defaultPackage.${system};
 
         inherit (import "${crate2nix}/tools.nix" { inherit pkgs; })
           generatedCargoNix;
@@ -36,7 +35,7 @@
               nativeBuildInputs = [ pkgs.makeWrapper ];
               postInstall =
                 "wrapProgram $out/bin/update-daemon --prefix PATH : ${
-                  pkgs.lib.makeBinPath [ pkgs.nixUnstable pkgs.gitMinimal ]
+                  pkgs.lib.makeBinPath [ nix' pkgs.gitMinimal ]
                 }";
             };
           };
@@ -50,7 +49,7 @@
         devShell = pkgs.mkShell {
           inputsFrom = builtins.attrValues self.packages.${system};
           buildInputs = with pkgs; [
-            nixUnstable
+            nix'
             cargo
             rust-analyzer
             rustfmt
