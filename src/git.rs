@@ -83,6 +83,8 @@ pub enum InitError {
     SetHeadToDefaultBranch(git2::Error),
     #[error("Error resetting to default branch commit: {0}")]
     ResetToDefaultBranchCommit(git2::Error),
+    #[error("Error force-resetting default branch to upstream default branch: {0}")]
+    SetDefaultBranch(git2::Error),
 }
 
 /// Initialize the repository:
@@ -157,6 +159,12 @@ pub fn init_repo(
 
         repo.reset(default_branch_commit.as_object(), ResetType::Hard, None)
             .map_err(InitError::ResetToDefaultBranchCommit)?;
+
+        repo.branch(
+            &settings.default_branch,
+            &default_branch_commit,
+            true,
+        ).map_err(InitError::SetDefaultBranch)?;
 
         repo.set_head(format!("refs/heads/{}", settings.default_branch).as_str())
             .map_err(InitError::SetHeadToDefaultBranch)?;
