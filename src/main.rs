@@ -94,8 +94,11 @@ async fn update_repo(
     let diff_default = default_branch_lock.diff(&after)?;
 
     let mut body = diff_default.markdown();
-    body.push('\n');
-    body.push_str(settings.extra_body.as_str());
+    body.push_str(&format!(
+        "\nLast updated: {}\n\n{}",
+        chrono::Utc::now(),
+        settings.extra_body
+    ));
 
     if diff.len() > 0 {
         info!("{}:\n{}", handle, diff.spaced());
