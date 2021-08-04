@@ -48,7 +48,10 @@
 
         devShell = pkgs.mkShell {
           inputsFrom = builtins.attrValues self.packages.${system};
+          RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
           buildInputs = with pkgs; [
+            rustc
+            rust.packages.stable.rustPlatform.rustLibSrc
             nix'
             cargo
             rust-analyzer
