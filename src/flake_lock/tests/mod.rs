@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2021 Serokell <https://serokell.io>
+//
+// SPDX-License-Identifier: MPL-2.0
+
 use super::*;
 
 // If you add a new valid flake.lock to resources, also add it here
