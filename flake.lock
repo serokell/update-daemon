@@ -3,11 +3,11 @@
     "crate2nix": {
       "flake": false,
       "locked": {
-        "lastModified": 1628505792,
-        "narHash": "sha256-f83Zx4Kl4TBugclLa6K5V0yYcRgUQtXSxegKV4JPTmI=",
+        "lastModified": 1628701000,
+        "narHash": "sha256-NR0IHfM2PwhT64/ofj7lwLCtsLEtCEgx1LRyjh1TEhI=",
         "owner": "kolloch",
         "repo": "crate2nix",
-        "rev": "ca44501f6e848bb3a61ff75197e7d7f2d4700423",
+        "rev": "871507b19add5ddfd2ef8bcb9c9d79b26b95ba98",
         "type": "github"
       },
       "original": {
