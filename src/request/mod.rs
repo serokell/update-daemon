@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use super::types::*;
-use thiserror::Error;
 use log::warn;
+use thiserror::Error;
 
 mod github;
 
@@ -23,10 +23,10 @@ pub async fn submit_or_update_request(
     match handle {
         RepoHandle::GitHub { owner, repo } => {
             github::submit_or_update_pull_request(settings, owner, repo, diff, submit).await?;
-        },
+        }
         RepoHandle::GitNone { url } => {
             warn!("Not sending a pull request for {}", url);
-        },
+        }
     }
     Ok(())
 }

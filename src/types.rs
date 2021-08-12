@@ -93,10 +93,10 @@ impl Display for RepoHandle {
         match self {
             RepoHandle::GitHub { owner, repo, .. } => {
                 write!(f, "ssh://git@github.com/{}/{}", owner, repo)?;
-            },
+            }
             RepoHandle::GitNone { url, .. } => {
                 write!(f, "{}", url)?;
-            },
+            }
         };
         Ok(())
     }
