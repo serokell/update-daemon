@@ -52,6 +52,7 @@
         };
 
         devShell = pkgs.mkShell {
+          RUST_LOG = "trace";
           inputsFrom = builtins.attrValues self.packages.${system};
           RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
           buildInputs = with pkgs; [

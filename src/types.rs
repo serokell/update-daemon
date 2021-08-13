@@ -69,9 +69,16 @@ pub struct UpdateState {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type")]
+/// Supported repository types.
+/// All repositories are fetched and pushed using git, but pull requests are submitted differently.
 pub enum RepoHandle {
     #[serde(rename = "github")]
+    /// GitHub: fetches with ssh, submits pull requests using GitHub API.
     GitHub { owner: String, repo: String },
+    #[serde(rename = "git+none")]
+    /// Pure git with **no pull request support**.
+    /// Useful for debugging.
+    GitNone { url: String },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -86,6 +93,9 @@ impl Display for RepoHandle {
         match self {
             RepoHandle::GitHub { owner, repo, .. } => {
                 write!(f, "ssh://git@github.com/{}/{}", owner, repo)?;
+            }
+            RepoHandle::GitNone { url, .. } => {
+                write!(f, "{}", url)?;
             }
         };
         Ok(())

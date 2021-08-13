@@ -179,8 +179,6 @@ pub enum SetupUpdateBranchError {
     GitError(#[from] git2::Error),
     #[error("Error finding default branch on repository: {0}")]
     FindDefaultBranch(git2::Error),
-    #[error("Error finding update branch on repository: {0}")]
-    FindUpdateBranch(git2::Error),
     #[error("Error peeling to default branch commit: {0}")]
     PeelDefaultBranchCommit(git2::Error),
     #[error("Error creating a new branch pointing to default branch commit: {0}")]
@@ -191,22 +189,22 @@ pub enum SetupUpdateBranchError {
     InitializeRebase(git2::Error),
     #[error("Error creating signature for rebase commits: {0}")]
     SigningForRebaseCommits(git2::Error),
-    #[error("Error opening current rebase: {0}")]
-    OpenRebase(git2::Error),
     #[error("Error committing rebase patch: {0}")]
     RebaseCommit(git2::Error),
     #[error("Error finishing rebase: {0}")]
     FinishRebase(git2::Error),
     #[error("Error setting head to update branch: {0}")]
     SetUpdateBranchHead(git2::Error),
-    #[error("Error peeling to remote update branch commit: {0}")]
-    PeelRemoteUpdateBranchCommit(git2::Error),
     #[error("Error peeling to local update branch commit: {0}")]
     PeelLocalUpdateBranchCommit(git2::Error),
     #[error("Error finding annotated commit for update branch commit: {0}")]
     FindAnnotatedUpdateBranchCommit(git2::Error),
     #[error("Error finding annotated commit for default branch commit: {0}")]
     FindAnnotatedDefaultBranchCommit(git2::Error),
+    #[error("Error getting HEAD: {0}")]
+    GetHead(git2::Error),
+    #[error("Error peeling HEAD to commit: {0}")]
+    PeelHead(git2::Error),
 }
 
 pub fn setup_update_branch(
@@ -235,21 +233,7 @@ pub fn setup_update_branch(
                 .map_err(SetupUpdateBranchError::BranchToUpdateBranchWithDefault)?;
         }
         Ok(remote_update_branch) => {
-            repo.branch(
-                &settings.update_branch,
-                &remote_update_branch
-                    .into_reference()
-                    .peel_to_commit()
-                    .map_err(SetupUpdateBranchError::PeelRemoteUpdateBranchCommit)?,
-                true,
-            )
-            .map_err(SetupUpdateBranchError::BranchToUpdateBranchWithRemoteBranch)?;
-
-            let local_update_branch = repo
-                .find_branch(&settings.update_branch, BranchType::Local)
-                .map_err(SetupUpdateBranchError::FindUpdateBranch)?;
-
-            let update_branch_commit = local_update_branch
+            let update_branch_commit = &remote_update_branch
                 .into_reference()
                 .peel_to_commit()
                 .map_err(SetupUpdateBranchError::PeelLocalUpdateBranchCommit)?;
@@ -262,7 +246,7 @@ pub fn setup_update_branch(
                 repo.find_annotated_commit(default_branch_commit.id())
                     .map_err(SetupUpdateBranchError::FindAnnotatedDefaultBranchCommit)?;
 
-            let rebase = repo
+            let mut rebase = repo
                 .rebase(
                     Some(&update_annotated_commit),
                     None,
@@ -274,21 +258,38 @@ pub fn setup_update_branch(
             let committer = Signature::now(&settings.author.name, &settings.author.email)
                 .map_err(SetupUpdateBranchError::SigningForRebaseCommits)?;
 
-            for _ in rebase {
-                repo.open_rebase(None)
-                    .map_err(SetupUpdateBranchError::OpenRebase)?
+            loop {
+                let op = rebase.next();
+
+                if op.is_none() {
+                    break;
+                }
+
+                rebase
                     .commit(None, &committer, None)
                     .map_err(SetupUpdateBranchError::RebaseCommit)?;
             }
 
-            repo.open_rebase(None)
-                .map_err(SetupUpdateBranchError::OpenRebase)?
+            rebase
                 .finish(None)
                 .map_err(SetupUpdateBranchError::FinishRebase)?;
+
+            let head = repo.head().map_err(SetupUpdateBranchError::GetHead)?;
+
+            repo.branch(
+                &settings.update_branch,
+                &head
+                    .peel_to_commit()
+                    .map_err(SetupUpdateBranchError::PeelHead)?,
+                true,
+            )
+            .map_err(SetupUpdateBranchError::BranchToUpdateBranchWithRemoteBranch)?;
         }
     };
+
     repo.set_head(&format!("refs/heads/{}", settings.update_branch))
         .map_err(SetupUpdateBranchError::SetUpdateBranchHead)?;
+
     Ok(())
 }
 
