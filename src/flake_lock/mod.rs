@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2021 Serokell <https://serokell.io>
+//
+// SPDX-License-Identifier: MPL-2.0
+
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};

@@ -13,10 +13,10 @@
     flake-compat.flake = false;
   };
 
-  outputs = { self, nixpkgs, crate2nix, flake-utils, nix, flake-compat }:
+  outputs = { self, nixpkgs, crate2nix, flake-utils, nix, flake-compat, serokell-nix }:
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = nixpkgs.legacyPackages.${system}.extend serokell-nix.overlay;
         crateName = "update-daemon";
 
         nix' = nix.defaultPackage.${system};
@@ -45,6 +45,11 @@
         packages.${crateName} = project.rootCrate.build;
 
         defaultPackage = self.packages.${system}.${crateName};
+
+        checks = {
+          trailing-whitespace = pkgs.build.checkTrailingWhitespace ./.;
+          reuse-lint = pkgs.build.reuseLint ./.;
+        };
 
         devShell = pkgs.mkShell {
           inputsFrom = builtins.attrValues self.packages.${system};
