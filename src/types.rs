@@ -74,7 +74,7 @@ pub struct UpdateState {
 pub enum RepoHandle {
     #[serde(rename = "github")]
     /// GitHub: fetches with ssh, submits pull requests using GitHub API.
-    GitHub { owner: String, repo: String },
+    GitHub { base_url: Option<String>, ssh_url: Option<String>, owner: String, repo: String },
     #[serde(rename = "git+none")]
     /// Pure git with **no pull request support**.
     /// Useful for debugging.
@@ -91,8 +91,8 @@ pub struct Repo {
 impl Display for RepoHandle {
     fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
         match self {
-            RepoHandle::GitHub { owner, repo, .. } => {
-                write!(f, "ssh://git@github.com/{}/{}", owner, repo)?;
+            RepoHandle::GitHub { owner, repo, ssh_url, .. } => {
+                write!(f, "ssh://{}/{}/{}", ssh_url.as_ref().unwrap_or(&"git@github.com".to_string()), owner, repo)?;
             }
             RepoHandle::GitNone { url, .. } => {
                 write!(f, "{}", url)?;

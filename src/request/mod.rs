@@ -21,8 +21,8 @@ pub async fn submit_or_update_request(
     submit: bool,
 ) -> Result<(), RequestError> {
     match handle {
-        RepoHandle::GitHub { owner, repo } => {
-            github::submit_or_update_pull_request(settings, owner, repo, diff, submit).await?;
+        RepoHandle::GitHub { base_url, owner, repo, .. } => {
+            github::submit_or_update_pull_request(settings, base_url, owner, repo, diff, submit).await?;
         }
         RepoHandle::GitNone { url } => {
             warn!("Not sending a pull request for {}", url);
@@ -43,9 +43,10 @@ pub async fn submit_error_report(
     report: String,
 ) -> Result<(), ErrorReportError> {
     match handle {
-        RepoHandle::GitHub { owner, repo } => {
+        RepoHandle::GitHub { base_url, owner, repo, .. } => {
             github::submit_issue_or_pull_request_comment(
                 settings,
+                base_url,
                 owner,
                 repo,
                 "Failed to automatically update flake.lock".to_string(),

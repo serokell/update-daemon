@@ -7,6 +7,8 @@ use thiserror::Error;
 
 use log::*;
 
+const GITHUB_BASE_URL: &str = "https://api.github.com";
+
 #[derive(Debug, Error)]
 pub enum PullRequestError {
     #[error("Error during a github operation: {0:?}")]
@@ -17,12 +19,14 @@ pub enum PullRequestError {
 
 pub async fn submit_or_update_pull_request(
     settings: UpdateSettings,
+    base_url: Option<String>,
     owner: String,
     repo: String,
     body: String,
     submit: bool,
 ) -> Result<(), PullRequestError> {
     let crab = octocrab::OctocrabBuilder::new()
+        .base_url(base_url.unwrap_or(GITHUB_BASE_URL.to_string()))?
         .personal_token(std::env::var("GITHUB_TOKEN")?)
         .build()?;
     let query = format!(
@@ -68,12 +72,14 @@ pub async fn submit_or_update_pull_request(
 
 pub async fn submit_issue_or_pull_request_comment(
     settings: UpdateSettings,
+    base_url: Option<String>,
     owner: String,
     repo: String,
     title: String,
     body: String,
 ) -> Result<(), PullRequestError> {
     let crab = octocrab::OctocrabBuilder::new()
+        .base_url(base_url.unwrap_or(GITHUB_BASE_URL.to_string()))?
         .personal_token(std::env::var("GITHUB_TOKEN")?)
         .build()?;
 
