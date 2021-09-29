@@ -81,6 +81,7 @@ pub async fn submit_issue_or_pull_request_comment(
         "head:{} base:{} is:pr state:open repo:{}/{}",
         settings.update_branch, settings.default_branch, owner, repo
     );
+
     let mut page = crab
         .search()
         .issues_and_pull_requests(query.as_str())
@@ -92,13 +93,33 @@ pub async fn submit_issue_or_pull_request_comment(
         crab.issues(owner, repo)
             .create_comment(pr.number as u64, body)
             .await?;
-        return Ok(());
     } else {
-        crab.issues(owner, repo)
-            .create(title)
-            .body(body)
+
+        let me = crab.current().user().await?.login;
+
+        // FIXME: technically this might match unrelated issues if the user is not uniquely used by this bot
+        let query = format!(
+            "state:open is:issue author:{} repo:{}/{}",
+            me, owner, repo
+        );
+
+        let mut page = crab
+            .search()
+            .issues_and_pull_requests(query.as_str())
             .send()
             .await?;
+
+        if let Some(issue) = page.items.pop() {
+            crab.issues(owner, repo)
+                .create_comment(issue.number as u64, body)
+                .await?;
+        } else {
+            crab.issues(owner, repo)
+                .create(title)
+                .body(body)
+                .send()
+                .await?;
+        }
     }
 
     Ok(())
