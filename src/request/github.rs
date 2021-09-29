@@ -28,7 +28,9 @@ pub async fn submit_or_update_pull_request(
 ) -> Result<(), PullRequestError> {
     let crab = octocrab::OctocrabBuilder::new()
         .base_url(base_url.unwrap_or(GITHUB_BASE_URL.to_string()))?
-        .personal_token(std::env::var(token_env_var.unwrap_or("GITHUB_TOKEN".to_string()))?)
+        .personal_token(std::env::var(
+            token_env_var.unwrap_or("GITHUB_TOKEN".to_string()),
+        )?)
         .build()?;
     let query = format!(
         "head:{} base:{} is:pr state:open repo:{}/{}",
@@ -49,11 +51,9 @@ pub async fn submit_or_update_pull_request(
             .send()
             .await?;
         info!("Updated PR {}", pr.html_url);
-        return Ok(());
     }
-
     // If there isn't, submit only when `submit` is passed
-    if submit {
+    else if submit {
         let pr = crab
             .pulls(owner.clone(), repo.clone())
             .create(
@@ -82,7 +82,9 @@ pub async fn submit_issue_or_pull_request_comment(
 ) -> Result<(), PullRequestError> {
     let crab = octocrab::OctocrabBuilder::new()
         .base_url(base_url.unwrap_or(GITHUB_BASE_URL.to_string()))?
-        .personal_token(std::env::var(token_env_var.unwrap_or("GITHUB_TOKEN".to_string()))?)
+        .personal_token(std::env::var(
+            token_env_var.unwrap_or("GITHUB_TOKEN".to_string()),
+        )?)
         .build()?;
 
     let query = format!(
@@ -102,14 +104,10 @@ pub async fn submit_issue_or_pull_request_comment(
             .create_comment(pr.number as u64, body)
             .await?;
     } else {
-
         let me = crab.current().user().await?.login;
 
         // FIXME: technically this might match unrelated issues if the user is not uniquely used by this bot
-        let query = format!(
-            "state:open is:issue author:{} repo:{}/{}",
-            me, owner, repo
-        );
+        let query = format!("state:open is:issue author:{} repo:{}/{}", me, owner, repo);
 
         let mut page = crab
             .search()

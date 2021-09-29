@@ -74,7 +74,21 @@ pub struct UpdateState {
 pub enum RepoHandle {
     #[serde(rename = "github")]
     /// GitHub: fetches with ssh, submits pull requests using GitHub API.
-    GitHub { base_url: Option<String>, ssh_url: Option<String>, token_env_var: Option<String>, owner: String, repo: String },
+    GitHub {
+        base_url: Option<String>,
+        ssh_url: Option<String>,
+        token_env_var: Option<String>,
+        owner: String,
+        repo: String,
+    },
+    #[serde(rename = "gitlab")]
+    /// GitLab: fetches with ssh, submits merge requests using GitLab API.
+    GitLab {
+        base_url: Option<String>,
+        ssh_url: Option<String>,
+        token_env_var: Option<String>,
+        project: String,
+    },
     #[serde(rename = "git+none")]
     /// Pure git with **no pull request support**.
     /// Useful for debugging.
@@ -91,8 +105,31 @@ pub struct Repo {
 impl Display for RepoHandle {
     fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
         match self {
-            RepoHandle::GitHub { owner, repo, ssh_url, .. } => {
-                write!(f, "ssh://{}/{}/{}", ssh_url.as_ref().unwrap_or(&"git@github.com".to_string()), owner, repo)?;
+            RepoHandle::GitHub {
+                owner,
+                repo,
+                ssh_url,
+                ..
+            } => {
+                write!(
+                    f,
+                    "ssh://{}/{}/{}",
+                    ssh_url.as_ref().unwrap_or(&"git@github.com".to_string()),
+                    owner,
+                    repo
+                )?;
+            }
+            RepoHandle::GitLab {
+                project,
+                ssh_url,
+                ..
+            } => {
+                write!(
+                    f,
+                    "ssh://{}/{}",
+                    ssh_url.as_ref().unwrap_or(&"git@gitlab.com".to_string()),
+                    project
+                )?;
             }
             RepoHandle::GitNone { url, .. } => {
                 write!(f, "{}", url)?;
