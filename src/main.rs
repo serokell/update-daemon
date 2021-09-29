@@ -31,8 +31,10 @@ use std::convert::TryInto;
 enum FlakeUpdateError {
     #[error("Error while running the command: {0}")]
     CommandError(#[from] std::io::Error),
-    #[error("Command was terminated or exited with a non-zero status: {0:?}")]
-    ExitStatusError(Option<i32>),
+    #[error("Command output was not valid UTF-8: {0}")]
+    Utf8Error(#[from] std::str::Utf8Error),
+    #[error("Command was terminated or exited with a non-zero status {0:?} and the following output: \n {1}")]
+    ExitStatusError(Option<i32>, String),
 }
 
 fn flake_update<'a>(workdir: &Path) -> Result<(), FlakeUpdateError> {
@@ -41,10 +43,15 @@ fn flake_update<'a>(workdir: &Path) -> Result<(), FlakeUpdateError> {
     nix_flake_update.arg("update");
     nix_flake_update.arg("--no-warn-dirty");
     nix_flake_update.current_dir(workdir.to_str().unwrap());
-    let status = nix_flake_update.status()?;
+    let output = nix_flake_update.output()?;
 
-    if !status.success() {
-        return Err(FlakeUpdateError::ExitStatusError(status.code()));
+    info!("{}", std::str::from_utf8(&output.stdout)?);
+
+    if !output.status.success() {
+        return Err(FlakeUpdateError::ExitStatusError(
+            output.status.code(),
+            std::str::from_utf8(&output.stderr)?.to_string(),
+        ));
     }
 
     Ok(())
