@@ -251,7 +251,7 @@ async fn main() {
                         let _ = request::submit_error_report(
                             settings,
                             repo.handle,
-                            format!("I tried updating flake.lock, but failed:\n\n{}", e),
+                            format!("I tried updating flake.lock, but failed:\n\n```\n{}\n```", e),
                         )
                         .await;
                         Err(())
