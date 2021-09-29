@@ -9,7 +9,7 @@
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL%202.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
 
 update-daemon is a oneshot "daemon" that updates Nix flakes in multiple repositories
-and sends "pull requests" (currently only github supported).
+and sends "pull requests" (currently github and gitlab supported).
 
 ## Usage
 
@@ -22,8 +22,8 @@ fields, in case you want to configure the daemon manually.
 - Currently, update-daemon runs as root and uses `/root/.cache/update-daemon` for caching repositories;
 - By default, configuration will be read from `$XDG_CONFIG_HOME/update-daemon/config.json`, but you can override that by providing the configuration as a CLI argument;
 - Flakes are fetched and updated in parallel;
-- In case any of the flakes fail to update, update-daemon will exit with a non-zero exit code (but still finish updating all the other flakes);
-- In case the PR already exists, update-daemon will push new commits with updates rather than force-push the old ones. This is useful if you push some commits (e.g. fixing issues arising from the update) there manually. It will also rebase the branch on top of latest "default" branch.
+- In case any of the flakes fail to update, update-daemon will exit with a non-zero exit code (but still finish updating all the other flakes), and submit an error report either as a comment on the PR or the issue;
+- In case the PR already exists, update-daemon will force-push a single commit there, unless "human" commits are on the same branch compared to master, in which case it will fail.
 
 ## Hacking
 
