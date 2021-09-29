@@ -97,9 +97,7 @@ pub async fn submit_error_report(
             )
             .await?;
         }
-        RepoHandle::GitLab {
-            ..
-        } => {
+        RepoHandle::GitLab { .. } => {
             warn!("Reporting errors to gitlab repositories is not yet supported");
         }
         RepoHandle::GitNone { url } => {

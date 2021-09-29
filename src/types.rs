@@ -120,9 +120,7 @@ impl Display for RepoHandle {
                 )?;
             }
             RepoHandle::GitLab {
-                project,
-                ssh_url,
-                ..
+                project, ssh_url, ..
             } => {
                 write!(
                     f,
