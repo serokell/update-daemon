@@ -47,6 +47,11 @@ in {
           default = { };
           example = { serokell.update-daemon = { }; };
         };
+        gitlab = mkOption {
+          type = attrsOf (attrsOf (attrs));
+          description = "Gitlab Repositories to update";
+          default = { };
+        };
       };
       settings = {
         author = {
