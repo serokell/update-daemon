@@ -22,12 +22,13 @@ pub async fn submit_or_update_pull_request(
     base_url: Option<String>,
     owner: String,
     repo: String,
+    token_env_var: Option<String>,
     body: String,
     submit: bool,
 ) -> Result<(), PullRequestError> {
     let crab = octocrab::OctocrabBuilder::new()
         .base_url(base_url.unwrap_or(GITHUB_BASE_URL.to_string()))?
-        .personal_token(std::env::var("GITHUB_TOKEN")?)
+        .personal_token(std::env::var(token_env_var.unwrap_or("GITHUB_TOKEN".to_string()))?)
         .build()?;
     let query = format!(
         "head:{} base:{} is:pr state:open repo:{}/{}",
@@ -75,12 +76,13 @@ pub async fn submit_issue_or_pull_request_comment(
     base_url: Option<String>,
     owner: String,
     repo: String,
+    token_env_var: Option<String>,
     title: String,
     body: String,
 ) -> Result<(), PullRequestError> {
     let crab = octocrab::OctocrabBuilder::new()
         .base_url(base_url.unwrap_or(GITHUB_BASE_URL.to_string()))?
-        .personal_token(std::env::var("GITHUB_TOKEN")?)
+        .personal_token(std::env::var(token_env_var.unwrap_or("GITHUB_TOKEN".to_string()))?)
         .build()?;
 
     let query = format!(

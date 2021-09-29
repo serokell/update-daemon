@@ -74,7 +74,7 @@ pub struct UpdateState {
 pub enum RepoHandle {
     #[serde(rename = "github")]
     /// GitHub: fetches with ssh, submits pull requests using GitHub API.
-    GitHub { base_url: Option<String>, ssh_url: Option<String>, owner: String, repo: String },
+    GitHub { base_url: Option<String>, ssh_url: Option<String>, token_env_var: Option<String>, owner: String, repo: String },
     #[serde(rename = "git+none")]
     /// Pure git with **no pull request support**.
     /// Useful for debugging.
