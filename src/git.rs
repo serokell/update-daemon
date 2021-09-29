@@ -192,14 +192,19 @@ pub fn setup_update_branch(
     settings: &UpdateSettings,
     repo: &Repository,
 ) -> Result<(), SetupUpdateBranchError> {
-
     let update_branch = repo.find_branch(
         &format!("origin/{}", settings.update_branch),
         BranchType::Remote,
     );
 
     if let Ok(b) = update_branch {
-        if b.into_reference().peel_to_commit().map_err(SetupUpdateBranchError::PeelUpdateBranchCommit)?.author().email() != Some(&settings.author.email) {
+        if b.into_reference()
+            .peel_to_commit()
+            .map_err(SetupUpdateBranchError::PeelUpdateBranchCommit)?
+            .author()
+            .email()
+            != Some(&settings.author.email)
+        {
             return Err(SetupUpdateBranchError::HumanCommitsInUpdateBranch);
         }
     }
@@ -217,7 +222,6 @@ pub fn setup_update_branch(
     // TODO: handle errors we care about here?
     repo.branch(&settings.update_branch, &default_branch_commit, true)
         .map_err(SetupUpdateBranchError::BranchToUpdateBranchWithDefault)?;
-
 
     repo.set_head(&format!("refs/heads/{}", settings.update_branch))
         .map_err(SetupUpdateBranchError::SetUpdateBranchHead)?;

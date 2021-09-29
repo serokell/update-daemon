@@ -30,3 +30,32 @@ pub async fn submit_or_update_request(
     }
     Ok(())
 }
+
+#[derive(Debug, Error)]
+pub enum ErrorReportError {
+    #[error("An error during github operation")]
+    GithubError(#[from] github::PullRequestError),
+}
+
+pub async fn submit_error_report(
+    settings: UpdateSettings,
+    handle: RepoHandle,
+    report: String,
+) -> Result<(), ErrorReportError> {
+    match handle {
+        RepoHandle::GitHub { owner, repo } => {
+            github::submit_issue_or_pull_request_comment(
+                settings,
+                owner,
+                repo,
+                "Failed to automatically update flake.lock".to_string(),
+                report,
+            )
+            .await?;
+        }
+        RepoHandle::GitNone { url } => {
+            warn!("Not submitting an error report for {}", url);
+        }
+    }
+    Ok(())
+}

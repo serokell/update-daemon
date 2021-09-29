@@ -232,9 +232,21 @@ async fn main() {
                     error!("{}: {}", repo_longlived.handle, e);
                     Err(())
                 }
-                Ok(settings) => match update_repo(repo.handle, state, settings).await {
+                Ok(settings) => match update_repo(
+                    repo.handle.clone(),
+                    state,
+                    (&settings as &UpdateSettings).clone(),
+                )
+                .await
+                {
                     Err(e) => {
                         error!("{}: {}", repo_longlived.handle, e);
+                        let _ = request::submit_error_report(
+                            settings,
+                            repo.handle,
+                            format!("I tried updating flake.lock, but failed:\n\n{}", e),
+                        )
+                        .await;
                         Err(())
                     }
                     Ok(()) => Ok(()),
