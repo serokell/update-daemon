@@ -78,3 +78,86 @@ pub async fn submit_or_update_merge_request(
 
     Ok(())
 }
+
+pub async fn submit_issue_or_merge_request_comment(
+    settings: UpdateSettings,
+    base_url: Option<String>,
+    project: String,
+    token_env_var: Option<String>,
+    title: String,
+    body: String,
+) -> Result<(), MergeRequestError> {
+    let gitlab = gitlab::Gitlab::builder(
+        base_url.unwrap_or("gitlab.com".to_string()),
+        std::env::var(token_env_var.unwrap_or("GITLAB_TOKEN".to_string()))?,
+    )
+    .build_async()
+    .await?;
+
+    let mr_search = MergeRequests::builder()
+        .project(project.clone())
+        .state(MergeRequestState::Opened)
+        .target_branch(&settings.default_branch)
+        .source_branch(&settings.update_branch)
+        .build()
+        .map_err(MergeRequestError::GitlabEndpointError)?;
+
+    let mut mr_page: Vec<gitlab::types::MergeRequest> = mr_search.query_async(&gitlab).await?;
+
+    // If there is a MR already, comment on it
+    if let Some(mr) = mr_page.pop() {
+        let mr_note_create = notes::CreateMergeRequestNote::builder()
+            .project(mr.project_id.value())
+            .merge_request(mr.iid.value())
+            .body(body)
+            .build()
+            .map_err(MergeRequestError::GitlabEndpointError)?;
+
+        let _ : gitlab::types::Note = mr_note_create.query_async(&gitlab).await?;
+    } else {
+        // let me = crab.current().user().await?.login;
+
+        let me_query = users::CurrentUser::builder()
+            .build()
+            .map_err(MergeRequestError::GitlabEndpointError)?;
+
+        let me: gitlab::types::User = me_query.query_async(&gitlab).await?;
+
+        // FIXME: technically this might match unrelated issues if the user is not uniquely used by this bot
+
+        let issue_search = projects::issues::Issues::builder()
+            .project(project.clone())
+            .state(projects::issues::IssueState::Opened)
+            .author(me.id.value())
+            .build()
+            .map_err(MergeRequestError::GitlabEndpointError)?;
+
+        let mut issues: Vec<gitlab::types::Issue> = issue_search.query_async(&gitlab).await?;
+
+        if issues.len() > 1 {
+            warn!("More than one issue; picking the first one and hoping for the best");
+        }
+
+        if let Some(issue) = issues.pop() {
+            let issue_note_create = projects::issues::notes::CreateIssueNote::builder()
+                .project(issue.project_id.value())
+                .issue(issue.iid.value())
+                .body(body)
+                .build()
+                .map_err(MergeRequestError::GitlabEndpointError)?;
+
+            let _ : gitlab::types::Note = issue_note_create.query_async(&gitlab).await?;
+        } else {
+            let issue_create = projects::issues::CreateIssue::builder()
+                .project(project)
+                .title(title)
+                .description(body)
+                .build()
+                .map_err(MergeRequestError::GitlabEndpointError)?;
+
+            let _ : gitlab::types::Issue = issue_create.query_async(&gitlab).await?;
+        }
+    }
+
+    Ok(())
+}

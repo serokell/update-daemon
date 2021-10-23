@@ -71,6 +71,8 @@ pub async fn submit_or_update_request(
 pub enum ErrorReportError {
     #[error("An error during github operation: {0}")]
     GithubError(#[from] github::PullRequestError),
+    #[error("An error during gitlab operation: {0}")]
+    GitlabError(#[from] gitlab::MergeRequestError),
 }
 
 pub async fn submit_error_report(
@@ -97,8 +99,21 @@ pub async fn submit_error_report(
             )
             .await?;
         }
-        RepoHandle::GitLab { .. } => {
-            warn!("Reporting errors to gitlab repositories is not yet supported");
+        RepoHandle::GitLab {
+            base_url,
+            project,
+            token_env_var,
+            ..
+        } => {
+            gitlab::submit_issue_or_merge_request_comment(
+                settings,
+                base_url,
+                project,
+                token_env_var,
+                ERROR_REPORT_TITLE.to_string(),
+                report,
+            )
+            .await?;
         }
         RepoHandle::GitNone { url } => {
             warn!("Not submitting an error report for {}", url);

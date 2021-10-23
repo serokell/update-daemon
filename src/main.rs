@@ -248,12 +248,20 @@ async fn main() {
                 {
                     Err(e) => {
                         error!("{}: {}", repo_longlived.handle, e);
-                        let _ = request::submit_error_report(
+                        match request::submit_error_report(
                             settings,
                             repo.handle,
-                            format!("I tried updating flake.lock, but failed:\n\n```\n{}\n```", e),
+                            format!(
+                                "I tried updating flake.lock, but failed:\n\n```\n{}\n```",
+                                e
+                            ),
                         )
-                        .await;
+                        .await {
+                            Err(e) => {
+                                error!("An error occured while submitting the error report: {}", e);
+                            }
+                            _ => {}
+                        };
                         Err(())
                     }
                     Ok(()) => Ok(()),
