@@ -53,6 +53,11 @@ in {
           default = { };
         };
       };
+      extraRepos = mkOption {
+        type = listOf attrs;
+        description = "Other repositories to update";
+        default = [  ];
+      };
       settings = {
         author = {
           name = mkOption {
@@ -100,7 +105,7 @@ in {
         ${cfg.agentSetup}
         update-daemon ${
           builtins.toFile "config.json"
-          (builtins.toJSON (cfg.settings // { inherit repos; }))
+          (builtins.toJSON (cfg.settings // { repos = repos // cfg.extraRepos; }))
         }
       '';
       startAt = cfg.updateDates;
