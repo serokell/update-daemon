@@ -105,7 +105,7 @@ in {
         ${cfg.agentSetup}
         update-daemon ${
           builtins.toFile "config.json"
-          (builtins.toJSON (cfg.settings // { repos = repos // cfg.extraRepos; }))
+          (builtins.toJSON (cfg.settings // { repos = repos ++ cfg.extraRepos; }))
         }
       '';
       startAt = cfg.updateDates;
