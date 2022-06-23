@@ -4,7 +4,6 @@
 
 use std::path::Path;
 
-use futures::Future;
 use std::process::Command;
 use std::sync::Arc;
 use xdg::BaseDirectories;
@@ -81,25 +80,10 @@ enum UpdateError {
     RequestError(#[from] request::RequestError),
 }
 
-async fn perform_with_delay<T>(
-    task: T,
-    previous_ts: Arc<TMutex<Instant>>,
-    delay: Duration,
-) -> T::Output
-where
-    T: Future,
-{
-    let mut locked_ts = previous_ts.lock().await;
-    loop {
-        let time_passed = Instant::now().duration_since(*locked_ts);
-
-        if time_passed >= delay {
-            let res = task.await;
-            *locked_ts = Instant::now();
-            return res;
-        } else {
-            tokio::time::sleep(delay - time_passed).await;
-        }
+async fn wait_for_delay(last_ts: Instant, delay: Duration) {
+    let time_passed = Instant::now().duration_since(last_ts);
+    if time_passed < delay {
+        tokio::time::sleep(delay - time_passed).await;
     }
 }
 
@@ -141,23 +125,21 @@ async fn update_repo(
         repo.commit(&settings, diff.spaced())?;
         repo.push(&settings)?;
 
-        perform_with_delay(
-            submit_or_update_request(settings, handle, body, true),
-            previous_update,
-            delay,
-        )
-        .await?;
+        let mut locked_ts = previous_update.lock().await;
+        wait_for_delay(*locked_ts, delay).await;
+        let res = submit_or_update_request(settings, handle, body, true).await;
+        *locked_ts = Instant::now();
+        res?;
     } else {
         info!("{}: Nothing to update", handle);
         if diff_default.len() > 0 {
             repo.push(&settings)?;
 
-            perform_with_delay(
-                submit_or_update_request(settings, handle, body, true),
-                previous_update,
-                delay,
-            )
-            .await?;
+            let mut locked_ts = previous_update.lock().await;
+            wait_for_delay(*locked_ts, delay).await;
+            let res = submit_or_update_request(settings, handle, body, true).await;
+            *locked_ts = Instant::now();
+            res?;
         }
     }
     Ok(())
@@ -293,26 +275,31 @@ async fn main() {
                 {
                     Err(e) => {
                         error!("{}: {}", repo_longlived.handle, e);
+
                         let delay = (&settings as &UpdateSettings).cooldown;
-                        match perform_with_delay(
-                            request::submit_error_report(
-                                settings,
-                                repo.handle,
-                                format!(
-                                    "I tried updating flake.lock, but failed:\n\n```\n{}\n```",
-                                    e
-                                ),
+                        let mut locked_ts = ts_copy2.lock().await;
+                        wait_for_delay(*locked_ts, delay).await;
+                        let result = request::submit_error_report(
+                            settings,
+                            repo.handle,
+                            format!(
+                                "I tried updating flake.lock, but failed:\n\n```\n{}\n```",
+                                e
                             ),
-                            ts_copy2,
-                            delay,
                         )
-                        .await
-                        {
+                        .await;
+
+                        *locked_ts = Instant::now();
+
+                        match result {
                             Err(e) => {
-                                error!("An error occured while submitting the error report: {}", e);
+                                error!(
+                                    "An error occurred while submitting the error report: {}",
+                                    e
+                                );
                             }
-                            _ => {}
-                        };
+                            Ok(_) => {}
+                        }
                         Err(())
                     }
                     Ok(()) => Ok(()),
