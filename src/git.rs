@@ -178,14 +178,34 @@ pub enum SetupUpdateBranchError {
     FindDefaultBranch(git2::Error),
     #[error("Error peeling to default branch commit: {0}")]
     PeelDefaultBranchCommit(git2::Error),
-    #[error("Error peeling to update branch commit: {0}")]
-    PeelUpdateBranchCommit(git2::Error),
     #[error("Error creating a new branch pointing to default branch commit: {0}")]
     BranchToUpdateBranchWithDefault(git2::Error),
     #[error("Error setting head to update branch: {0}")]
     SetUpdateBranchHead(git2::Error),
-    #[error("There are human commits in the update branch")]
-    HumanCommitsInUpdateBranch,
+    #[error("Error initializing rebase: {0}")]
+    InitializeRebase(git2::Error),
+    #[error("Error peeling to local update branch commit: {0}")]
+    PeelLocalUpdateBranchCommit(git2::Error),
+    #[error("Error finding annotated commit for update branch commit: {0}")]
+    FindAnnotatedUpdateBranchCommit(git2::Error),
+    #[error("Error creating signature for rebase commits: {0}")]
+    SigningForRebaseCommits(git2::Error),
+    #[error("Error finding annotated commit for default branch commit: {0}")]
+    FindAnnotatedDefaultBranchCommit(git2::Error),
+    #[error("Error getting next rebase patch: {0}")]
+    RebaseNext(git2::Error),
+    #[error("Error committing rebase patch, probably because of rebase conflicts: {0}")]
+    RebaseCommit(git2::Error),
+    #[error("Error finishing rebase: {0}")]
+    FinishRebase(git2::Error),
+    #[error("Error getting HEAD: {0}")]
+    GetHead(git2::Error),
+    #[error("Error peeling HEAD to commit: {0}")]
+    PeelHead(git2::Error),
+    #[error("Error creating a new branch pointing to remote update branch: {0}")]
+    BranchToUpdateBranchWithRemoteBranch(git2::Error),
+    #[error("Error aborting rebase: {0}")]
+    AbortRebase(git2::Error),
 }
 
 pub fn setup_update_branch(
@@ -197,18 +217,6 @@ pub fn setup_update_branch(
         BranchType::Remote,
     );
 
-    if let Ok(b) = update_branch {
-        if b.into_reference()
-            .peel_to_commit()
-            .map_err(SetupUpdateBranchError::PeelUpdateBranchCommit)?
-            .author()
-            .email()
-            != Some(&settings.author.email)
-        {
-            return Err(SetupUpdateBranchError::HumanCommitsInUpdateBranch);
-        }
-    }
-
     let default_branch_commit = repo
         .find_branch(
             &format!("origin/{}", &settings.default_branch),
@@ -219,9 +227,72 @@ pub fn setup_update_branch(
         .peel_to_commit()
         .map_err(SetupUpdateBranchError::PeelDefaultBranchCommit)?;
 
-    // TODO: handle errors we care about here?
-    repo.branch(&settings.update_branch, &default_branch_commit, true)
-        .map_err(SetupUpdateBranchError::BranchToUpdateBranchWithDefault)?;
+    match update_branch {
+        Err(_) => {
+            // no update branch exists, creating new one from default
+            // TODO: handle errors we care about here?
+            repo.branch(&settings.update_branch, &default_branch_commit, true)
+                .map_err(SetupUpdateBranchError::BranchToUpdateBranchWithDefault)?;
+        }
+        Ok(remote_update_branch) => {
+            // update branch exists, we should try to:
+            // 1. rebase update branch on top of default
+
+            let update_branch_commit = &remote_update_branch
+                .into_reference()
+                .peel_to_commit()
+                .map_err(SetupUpdateBranchError::PeelLocalUpdateBranchCommit)?;
+
+            let update_annotated_commit = repo
+                .find_annotated_commit(update_branch_commit.id())
+                .map_err(SetupUpdateBranchError::FindAnnotatedUpdateBranchCommit)?;
+
+            let default_annotated_commit =
+                repo.find_annotated_commit(default_branch_commit.id())
+                    .map_err(SetupUpdateBranchError::FindAnnotatedDefaultBranchCommit)?;
+
+            let mut rebase = repo
+                .rebase(
+                    Some(&update_annotated_commit),
+                    None,
+                    Some(&default_annotated_commit),
+                    None,
+                )
+                .map_err(SetupUpdateBranchError::InitializeRebase)?;
+
+            let committer = Signature::now(&settings.author.name, &settings.author.email)
+                .map_err(SetupUpdateBranchError::SigningForRebaseCommits)?;
+
+            while let Some(op) = rebase.next() {
+                op.map_err(SetupUpdateBranchError::RebaseNext)?;
+                match rebase.commit(None, &committer, None) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        // Potential conflicts, should abort the commit
+                        rebase
+                            .abort()
+                            .map_err(SetupUpdateBranchError::AbortRebase)?;
+                        return Err(SetupUpdateBranchError::RebaseCommit(e));
+                    }
+                }
+            }
+
+            rebase
+                .finish(None)
+                .map_err(SetupUpdateBranchError::FinishRebase)?;
+
+            let head = repo.head().map_err(SetupUpdateBranchError::GetHead)?;
+
+            repo.branch(
+                &settings.update_branch,
+                &head
+                    .peel_to_commit()
+                    .map_err(SetupUpdateBranchError::PeelHead)?,
+                true,
+            )
+            .map_err(SetupUpdateBranchError::BranchToUpdateBranchWithRemoteBranch)?;
+        }
+    };
 
     repo.set_head(&format!("refs/heads/{}", settings.update_branch))
         .map_err(SetupUpdateBranchError::SetUpdateBranchHead)?;
