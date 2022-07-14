@@ -91,6 +91,11 @@ in {
           description = "Extra lines to add to pull request body";
           default = "";
         };
+        cooldown = mkOption {
+          type = int;
+          description = "Cooldown duration between updating pull requests (in milliseconds)";
+          default = 100;
+        };
       };
     };
   config = lib.mkIf cfg.enable {

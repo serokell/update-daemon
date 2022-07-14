@@ -7,6 +7,7 @@ use serde::Deserialize;
 use std::default::Default;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
+use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -16,6 +17,7 @@ pub struct UpdateSettings {
     pub default_branch: String,
     pub title: String,
     pub extra_body: String,
+    pub cooldown: Duration,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -31,6 +33,7 @@ pub struct UpdateSettingsOptional {
     pub default_branch: Option<String>,
     pub title: Option<String>,
     pub extra_body: Option<String>,
+    pub cooldown: Option<u64>,
 }
 
 #[derive(Debug, Error)]
@@ -58,6 +61,8 @@ impl std::convert::TryInto<UpdateSettings> for UpdateSettingsOptional {
                 .title
                 .unwrap_or("Automatically update flake.lock".to_string()),
             extra_body: self.extra_body.unwrap_or(String::new()),
+            // what if negative number in config?
+            cooldown: Duration::from_millis(unoption(self.cooldown, "cooldown")?),
         })
     }
 }
