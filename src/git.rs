@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use git2::RemoteCallbacks;
 use git2::{BranchType, FetchOptions, PushOptions, Repository, ResetType, Signature};
+use git2::{Rebase, RemoteCallbacks};
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{create_dir, remove_dir_all};
 use std::hash::{Hash, Hasher};
@@ -182,6 +182,10 @@ pub enum SetupUpdateBranchError {
     BranchToUpdateBranchWithDefault(git2::Error),
     #[error("Error setting head to update branch: {0}")]
     SetUpdateBranchHead(git2::Error),
+    #[error("Error setting head to default branch: {0}")]
+    SetDefaultBranchHead(git2::Error),
+    #[error("Error resetting to default branch commit: {0}")]
+    ResetToDefaultBranchCommit(git2::Error),
     #[error("Error initializing rebase: {0}")]
     InitializeRebase(git2::Error),
     #[error("Error peeling to local update branch commit: {0}")]
@@ -194,7 +198,7 @@ pub enum SetupUpdateBranchError {
     FindAnnotatedDefaultBranchCommit(git2::Error),
     #[error("Error getting next rebase patch: {0}")]
     RebaseNext(git2::Error),
-    #[error("Error committing rebase patch, probably because of rebase conflicts: {0}")]
+    #[error("Error committing rebase patch: {0}")]
     RebaseCommit(git2::Error),
     #[error("Error finishing rebase: {0}")]
     FinishRebase(git2::Error),
@@ -204,8 +208,13 @@ pub enum SetupUpdateBranchError {
     PeelHead(git2::Error),
     #[error("Error creating a new branch pointing to remote update branch: {0}")]
     BranchToUpdateBranchWithRemoteBranch(git2::Error),
-    #[error("Error aborting rebase: {0}")]
-    AbortRebase(git2::Error),
+}
+
+fn safe_abort(rebase: &mut Rebase) {
+    match rebase.abort() {
+        Err(e) => error!("Rebase abort failed: {}", e),
+        _ => {}
+    }
 }
 
 pub fn setup_update_branch(
@@ -263,23 +272,42 @@ pub fn setup_update_branch(
             let committer = Signature::now(&settings.author.name, &settings.author.email)
                 .map_err(SetupUpdateBranchError::SigningForRebaseCommits)?;
 
+            let checkout_to_default = || -> Result<(), SetupUpdateBranchError> {
+                repo.set_head(&format!("refs/heads/{}", settings.default_branch))
+                    .map_err(SetupUpdateBranchError::SetDefaultBranchHead)?;
+
+                repo.reset(default_branch_commit.as_object(), ResetType::Hard, None)
+                    .map_err(SetupUpdateBranchError::ResetToDefaultBranchCommit)?;
+                Ok(())
+            };
+
             while let Some(op) = rebase.next() {
-                op.map_err(SetupUpdateBranchError::RebaseNext)?;
+                match op {
+                    Ok(_) => {}
+                    Err(e) => {
+                        safe_abort(&mut rebase);
+                        checkout_to_default()?;
+                        return Err(SetupUpdateBranchError::RebaseNext(e));
+                    }
+                }
+
                 match rebase.commit(None, &committer, None) {
                     Ok(_) => {}
                     Err(e) => {
-                        // Potential conflicts, should abort the commit
-                        rebase
-                            .abort()
-                            .map_err(SetupUpdateBranchError::AbortRebase)?;
+                        safe_abort(&mut rebase);
+                        checkout_to_default()?;
                         return Err(SetupUpdateBranchError::RebaseCommit(e));
                     }
                 }
             }
 
-            rebase
-                .finish(None)
-                .map_err(SetupUpdateBranchError::FinishRebase)?;
+            match rebase.finish(None) {
+                Ok(_) => {}
+                Err(e) => {
+                    checkout_to_default()?;
+                    return Err(SetupUpdateBranchError::FinishRebase(e));
+                }
+            }
 
             let head = repo.head().map_err(SetupUpdateBranchError::GetHead)?;
 
