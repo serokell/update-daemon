@@ -11,10 +11,27 @@ const GITHUB_BASE_URL: &str = "https://api.github.com";
 
 #[derive(Debug, Error)]
 pub enum PullRequestError {
-    #[error("Error during a github operation: {0:?}")]
-    GithubError(#[from] octocrab::Error),
+    #[error("Repository was archived so is read-only.")]
+    ReadOnlyRepo,
+    #[error("Other error during a github operation: {0}")]
+    GithubError(octocrab::Error),
     #[error("Couldn't get a GITHUB_TOKEN env var: {0}")]
     TokenError(#[from] std::env::VarError),
+}
+
+impl From<octocrab::Error> for PullRequestError {
+    fn from(e: octocrab::Error) -> Self {
+        match e {
+            octocrab::Error::GitHub { ref source, .. } => {
+                if source.message == "Repository was archived so is read-only." {
+                    PullRequestError::ReadOnlyRepo
+                } else {
+                    PullRequestError::GithubError(e)
+                }
+            }
+            e => PullRequestError::GithubError(e),
+        }
+    }
 }
 
 pub async fn submit_or_update_pull_request(

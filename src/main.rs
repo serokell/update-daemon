@@ -22,7 +22,6 @@ mod flake_lock;
 mod types;
 use types::*;
 mod request;
-use request::submit_or_update_request;
 
 use merge::Merge;
 
@@ -127,7 +126,7 @@ async fn update_repo(
 
         let mut locked_ts = previous_update.lock().await;
         wait_for_delay(*locked_ts, delay).await;
-        let res = submit_or_update_request(settings, handle, body, true).await;
+        let res = request::submit_or_update_request(settings, handle, body, true).await;
         *locked_ts = Instant::now();
         res?;
     } else {
@@ -137,7 +136,7 @@ async fn update_repo(
 
             let mut locked_ts = previous_update.lock().await;
             wait_for_delay(*locked_ts, delay).await;
-            let res = submit_or_update_request(settings, handle, body, true).await;
+            let res = request::submit_or_update_request(settings, handle, body, true).await;
             *locked_ts = Instant::now();
             res?;
         }
