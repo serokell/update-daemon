@@ -93,7 +93,7 @@ impl Lock {
     }
 
     fn get_input_by_path(&self, name: String, path: Vec<String>) -> Option<String> {
-        let mut name = name.clone();
+        let mut name = name;
         for input in path {
             name =
                 self.resolve_input(self.nodes.get(&name)?.clone().inputs?.get(&input)?.clone())?;
@@ -107,8 +107,7 @@ impl Lock {
                 .get(&self.root.clone())?
                 .clone()
                 .inputs
-                .unwrap_or(IndexMap::new())
-                .clone(),
+                .unwrap_or_default()
         )
     }
 
@@ -124,7 +123,7 @@ impl Lock {
         let mut diff: IndexMap<String, InputChange> = IndexMap::new();
 
         for (key, input_a) in new.root_deps().ok_or(LockDiffError::MissingRootNode)? {
-            let value_a = new.get_dep(input_a).ok_or(LockDiffError::MissingNodeError(
+            let value_a = new.get_dep(input_a).ok_or_else(|| LockDiffError::MissingNodeError(
                 key.clone(),
                 "root".to_string(),
             ))?;
@@ -194,7 +193,7 @@ fn format_date(date: i64) -> String {
 
 fn show_hash_and_date(
     f: &mut Formatter,
-    hash: &String,
+    hash: &str,
     last_modified: &Option<i64>,
 ) -> Result<(), std::fmt::Error> {
     match last_modified {
@@ -286,14 +285,14 @@ impl InputChange {
         let change = match self.clone() {
             InputChange::Add(l) => format!("(new) | `{}`", l),
             InputChange::Update { old, new } => format!("`{}` | `{}`", old, new),
-            InputChange::Delete => format!("(deleted) | (deleted)"),
+            InputChange::Delete => "(deleted) | (deleted)".to_string(),
         };
         format!(
             "{} | {}",
             change,
             self.link()
                 .map(|l| format!("[link]({})", l))
-                .unwrap_or("_none_".to_string())
+                .unwrap_or_else(|| "_none_".to_string())
         )
     }
 

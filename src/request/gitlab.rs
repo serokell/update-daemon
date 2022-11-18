@@ -33,8 +33,8 @@ pub async fn submit_or_update_merge_request(
     submit: bool,
 ) -> Result<(), MergeRequestError> {
     let gitlab = gitlab::Gitlab::builder(
-        base_url.unwrap_or("gitlab.com".to_string()),
-        std::env::var(token_env_var.unwrap_or("GITLAB_TOKEN".to_string()))?,
+        base_url.unwrap_or_else(|| "gitlab.com".to_string()),
+        std::env::var(token_env_var.unwrap_or_else(|| "GITLAB_TOKEN".to_string()))?,
     )
     .build_async()
     .await?;
@@ -88,8 +88,8 @@ pub async fn submit_issue_or_merge_request_comment(
     body: String,
 ) -> Result<(), MergeRequestError> {
     let gitlab = gitlab::Gitlab::builder(
-        base_url.unwrap_or("gitlab.com".to_string()),
-        std::env::var(token_env_var.unwrap_or("GITLAB_TOKEN".to_string()))?,
+        base_url.unwrap_or_else(|| "gitlab.com".to_string()),
+        std::env::var(token_env_var.unwrap_or_else(|| "GITLAB_TOKEN".to_string()))?,
     )
     .build_async()
     .await?;
