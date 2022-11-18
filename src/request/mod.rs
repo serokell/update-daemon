@@ -46,9 +46,10 @@ pub async fn submit_or_update_request(
             match res {
                 Err(e @ github::PullRequestError::ReadOnlyRepo) => {
                     warn!("{}", e);
-                }
-                Err(e) => return Err(e.into()),
-                Ok(_) => (),
+                    Ok(())
+                },
+                Err(e) => Err(e.into()),
+                Ok(_) => Ok(()),
             }
         }
         RepoHandle::GitLab {
@@ -65,13 +66,13 @@ pub async fn submit_or_update_request(
                 diff,
                 submit,
             )
-            .await?;
+            .await.map_err(|e| e.into())
         }
         RepoHandle::GitNone { url } => {
             warn!("Not sending a pull request for {}", url);
+            Ok(())
         }
     }
-    Ok(())
 }
 
 #[derive(Debug, Error)]

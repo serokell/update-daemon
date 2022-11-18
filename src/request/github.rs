@@ -22,13 +22,9 @@ pub enum PullRequestError {
 impl From<octocrab::Error> for PullRequestError {
     fn from(e: octocrab::Error) -> Self {
         match e {
-            octocrab::Error::GitHub { ref source, .. } => {
-                if source.message == "Repository was archived so is read-only." {
-                    PullRequestError::ReadOnlyRepo
-                } else {
-                    PullRequestError::GithubError(e)
-                }
-            }
+            octocrab::Error::GitHub { ref source, .. }
+                if source.message == "Repository was archived so is read-only." =>
+                    PullRequestError::ReadOnlyRepo,
             e => PullRequestError::GithubError(e),
         }
     }
