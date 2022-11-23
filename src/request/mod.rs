@@ -33,7 +33,7 @@ pub async fn submit_or_update_request(
             token_env_var,
             ..
         } => {
-            github::submit_or_update_pull_request(
+            let res = github::submit_or_update_pull_request(
                 settings,
                 base_url,
                 owner,
@@ -42,7 +42,15 @@ pub async fn submit_or_update_request(
                 diff,
                 submit,
             )
-            .await?;
+            .await;
+            match res {
+                Err(e @ github::PullRequestError::ReadOnlyRepo) => {
+                    warn!("{}", e);
+                    Ok(())
+                },
+                Err(e) => Err(e.into()),
+                Ok(_) => Ok(()),
+            }
         }
         RepoHandle::GitLab {
             base_url,
@@ -58,13 +66,13 @@ pub async fn submit_or_update_request(
                 diff,
                 submit,
             )
-            .await?;
+            .await.map_err(|e| e.into())
         }
         RepoHandle::GitNone { url } => {
             warn!("Not sending a pull request for {}", url);
+            Ok(())
         }
     }
-    Ok(())
 }
 
 #[derive(Debug, Error)]
@@ -88,7 +96,7 @@ pub async fn submit_error_report(
             token_env_var,
             ..
         } => {
-            github::submit_issue_or_pull_request_comment(
+            let res = github::submit_issue_or_pull_request_comment(
                 settings,
                 base_url,
                 owner,
@@ -97,7 +105,15 @@ pub async fn submit_error_report(
                 ERROR_REPORT_TITLE.to_string(),
                 report,
             )
-            .await?;
+            .await;
+
+            match res {
+                Err(e @ github::PullRequestError::ReadOnlyRepo) => {
+                    warn!("{}", e);
+                }
+                Err(e) => return Err(e.into()),
+                Ok(_) => (),
+            }
         }
         RepoHandle::GitLab {
             base_url,

@@ -7,7 +7,7 @@ use git2::{BranchType, FetchOptions, PushOptions, Repository, ResetType, Signatu
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{create_dir, remove_dir_all};
 use std::hash::{Hash, Hasher};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use thiserror::Error;
 
 use log::*;
@@ -45,15 +45,15 @@ impl UDRepo {
         &self,
         settings: &UpdateSettings,
     ) -> Result<(), SetupUpdateBranchError> {
-        Ok(setup_update_branch(settings, &self.repo)?)
+        setup_update_branch(settings, &self.repo)
     }
 
     pub fn commit(&self, settings: &UpdateSettings, diff: String) -> Result<(), CommitError> {
-        Ok(commit(settings, &self.repo, diff)?)
+        commit(settings, &self.repo, diff)
     }
 
     pub fn push(&self, settings: &UpdateSettings) -> Result<(), PushError> {
-        Ok(push(settings, &self.repo)?)
+        push(settings, &self.repo)
     }
 }
 
@@ -98,7 +98,7 @@ pub fn init_repo(
 ) -> Result<Repository, InitError> {
     let url = handle.to_string();
     let urlhash = calculate_hash(&url);
-    let mut repo_dir = PathBuf::from(state.cache_dir);
+    let mut repo_dir = state.cache_dir;
     repo_dir.push(urlhash);
 
     let mut callbacks = RemoteCallbacks::new();

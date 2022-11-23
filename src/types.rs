@@ -46,7 +46,7 @@ impl std::fmt::Display for UpdateSettingsMissingField {
 }
 
 fn unoption<T>(opt: Option<T>, name: &'static str) -> Result<T, UpdateSettingsMissingField> {
-    opt.ok_or(UpdateSettingsMissingField(name.to_string()))
+    opt.ok_or_else(|| UpdateSettingsMissingField(name.to_string()))
 }
 
 impl std::convert::TryInto<UpdateSettings> for UpdateSettingsOptional {
@@ -55,12 +55,12 @@ impl std::convert::TryInto<UpdateSettings> for UpdateSettingsOptional {
     fn try_into(self) -> Result<UpdateSettings, Self::Error> {
         Ok(UpdateSettings {
             author: unoption(self.author, "author")?,
-            update_branch: self.update_branch.unwrap_or("automatic-update".to_string()),
-            default_branch: self.default_branch.unwrap_or("master".to_string()),
+            update_branch: self.update_branch.unwrap_or_else(|| "automatic-update".to_string()),
+            default_branch: self.default_branch.unwrap_or_else(|| "master".to_string()),
             title: self
                 .title
-                .unwrap_or("Automatically update flake.lock".to_string()),
-            extra_body: self.extra_body.unwrap_or(String::new()),
+                .unwrap_or_else(|| "Automatically update flake.lock".to_string()),
+            extra_body: self.extra_body.unwrap_or_default(),
             // what if negative number in config?
             cooldown: Duration::from_millis(unoption(self.cooldown, "cooldown")?),
         })

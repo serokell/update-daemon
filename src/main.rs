@@ -22,7 +22,6 @@ mod flake_lock;
 mod types;
 use types::*;
 mod request;
-use request::submit_or_update_request;
 
 use merge::Merge;
 
@@ -33,14 +32,14 @@ use tokio::sync::Mutex as TMutex;
 #[derive(Debug, Error)]
 enum FlakeUpdateError {
     #[error("Error while running the command: {0}")]
-    CommandError(#[from] std::io::Error),
+    Command(#[from] std::io::Error),
     #[error("Command output was not valid UTF-8: {0}")]
-    Utf8Error(#[from] std::str::Utf8Error),
+    Utf8(#[from] std::str::Utf8Error),
     #[error("Command was terminated or exited with a non-zero status {0:?} and the following output: \n {1}")]
-    ExitStatusError(Option<i32>, String),
+    ExitStatus(Option<i32>, String),
 }
 
-fn flake_update<'a>(workdir: &Path) -> Result<(), FlakeUpdateError> {
+fn flake_update(workdir: &Path) -> Result<(), FlakeUpdateError> {
     let mut nix_flake_update = Command::new("nix");
     nix_flake_update.arg("flake");
     nix_flake_update.arg("update");
@@ -51,7 +50,7 @@ fn flake_update<'a>(workdir: &Path) -> Result<(), FlakeUpdateError> {
     info!("{}", std::str::from_utf8(&output.stdout)?);
 
     if !output.status.success() {
-        return Err(FlakeUpdateError::ExitStatusError(
+        return Err(FlakeUpdateError::ExitStatus(
             output.status.code(),
             std::str::from_utf8(&output.stderr)?.to_string(),
         ));
@@ -69,7 +68,7 @@ enum UpdateError {
     #[error("Error during update branch setup: {0}")]
     SetupUpdateBranchError(#[from] git::SetupUpdateBranchError),
     #[error("Error during flake update: {0}")]
-    FlakeUpdateError(#[from] FlakeUpdateError),
+    FlakeUpdate(#[from] FlakeUpdateError),
     #[error("Error while making a diff between lockfiles: {0}")]
     LockDiffError(#[from] flake_lock::LockDiffError),
     #[error("Error during git commit: {0}")]
@@ -127,7 +126,7 @@ async fn update_repo(
 
         let mut locked_ts = previous_update.lock().await;
         wait_for_delay(*locked_ts, delay).await;
-        let res = submit_or_update_request(settings, handle, body, true).await;
+        let res = request::submit_or_update_request(settings, handle, body, true).await;
         *locked_ts = Instant::now();
         res?;
     } else {
@@ -137,7 +136,7 @@ async fn update_repo(
 
             let mut locked_ts = previous_update.lock().await;
             wait_for_delay(*locked_ts, delay).await;
-            let res = submit_or_update_request(settings, handle, body, true).await;
+            let res = request::submit_or_update_request(settings, handle, body, true).await;
             *locked_ts = Instant::now();
             res?;
         }
@@ -160,6 +159,7 @@ struct Options {
 }
 
 #[derive(Debug, Clap)]
+#[allow(clippy::large_enum_variant)]
 enum SubCommand {
     #[clap()]
     CheckConfig,
@@ -251,7 +251,7 @@ async fn main() {
         let mut settings = repo
             .clone()
             .settings
-            .unwrap_or(types::UpdateSettingsOptional::default());
+            .unwrap_or_default();
 
         settings.merge(config.clone().settings);
 
@@ -291,14 +291,8 @@ async fn main() {
 
                         *locked_ts = Instant::now();
 
-                        match result {
-                            Err(e) => {
-                                error!(
-                                    "An error occurred while submitting the error report: {}",
-                                    e
-                                );
-                            }
-                            Ok(_) => {}
+                        if let Err(e) = result {
+                            error!("An error occurred while submitting the error report: {}", e);
                         }
                         Err(())
                     }
@@ -311,10 +305,7 @@ async fn main() {
     if futures::future::join_all(handles)
         .await
         .iter()
-        .all(|res| match res {
-            Ok(r) if r.is_ok() => true,
-            _ => false,
-        })
+        .all(|res| matches!(res, Ok(r) if r.is_ok()))
     {
         std::process::exit(0);
     } else {

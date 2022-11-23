@@ -11,10 +11,23 @@ const GITHUB_BASE_URL: &str = "https://api.github.com";
 
 #[derive(Debug, Error)]
 pub enum PullRequestError {
-    #[error("Error during a github operation: {0:?}")]
-    GithubError(#[from] octocrab::Error),
+    #[error("Repository was archived so is read-only.")]
+    ReadOnlyRepo,
+    #[error("Other error during a github operation: {0}")]
+    GithubError(octocrab::Error),
     #[error("Couldn't get a GITHUB_TOKEN env var: {0}")]
     TokenError(#[from] std::env::VarError),
+}
+
+impl From<octocrab::Error> for PullRequestError {
+    fn from(e: octocrab::Error) -> Self {
+        match e {
+            octocrab::Error::GitHub { ref source, .. }
+                if source.message == "Repository was archived so is read-only." =>
+                    PullRequestError::ReadOnlyRepo,
+            e => PullRequestError::GithubError(e),
+        }
+    }
 }
 
 pub async fn submit_or_update_pull_request(
@@ -27,9 +40,9 @@ pub async fn submit_or_update_pull_request(
     submit: bool,
 ) -> Result<(), PullRequestError> {
     let crab = octocrab::OctocrabBuilder::new()
-        .base_url(base_url.unwrap_or(GITHUB_BASE_URL.to_string()))?
+        .base_url(base_url.unwrap_or_else(|| GITHUB_BASE_URL.to_string()))?
         .personal_token(std::env::var(
-            token_env_var.unwrap_or("GITHUB_TOKEN".to_string()),
+            token_env_var.unwrap_or_else(|| "GITHUB_TOKEN".to_string()),
         )?)
         .build()?;
     let query = format!(
@@ -81,9 +94,9 @@ pub async fn submit_issue_or_pull_request_comment(
     body: String,
 ) -> Result<(), PullRequestError> {
     let crab = octocrab::OctocrabBuilder::new()
-        .base_url(base_url.unwrap_or(GITHUB_BASE_URL.to_string()))?
+        .base_url(base_url.unwrap_or_else(|| GITHUB_BASE_URL.to_string()))?
         .personal_token(std::env::var(
-            token_env_var.unwrap_or("GITHUB_TOKEN".to_string()),
+            token_env_var.unwrap_or_else(|| "GITHUB_TOKEN".to_string()),
         )?)
         .build()?;
 
