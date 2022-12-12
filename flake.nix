@@ -38,6 +38,11 @@
                   pkgs.lib.makeBinPath [ nix' pkgs.gitMinimal ]
                 }";
             };
+            # This package isn't compatible with openssl 3.0.7 for some reason
+            openssl-sys = oa : {
+              nativeBuildInputs = [ pkgs.pkg-config ];
+              buildInputs = [ pkgs.openssl_1_1 ];
+            };
           };
         };
 
