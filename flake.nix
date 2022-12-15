@@ -38,6 +38,9 @@
                   pkgs.lib.makeBinPath [ nix' pkgs.gitMinimal ]
                 }";
             };
+            openssl-sys = oa : {
+              buildInputs = oa.buildInputs + [ pkgs.openssl_1_1 ];
+            };
           };
         };
 
