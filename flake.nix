@@ -39,7 +39,7 @@
                 }";
             };
             openssl-sys = oa : {
-              buildInputs = oa.buildInputs + [ pkgs.openssl_1_1 ];
+              buildInputs = [ pkgs.openssl_1_1 ];
             };
           };
         };
