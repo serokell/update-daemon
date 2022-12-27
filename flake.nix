@@ -68,7 +68,7 @@
             rust-analyzer
             rustfmt
             clippy
-            openssl
+            openssl_1_1
             pkg-config
             reuse
           ];
