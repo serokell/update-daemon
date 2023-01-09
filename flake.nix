@@ -9,55 +9,65 @@
   };
 
   inputs = {
-    crate2nix.flake = false;
     flake-compat.flake = false;
+    naersk.url = "github:nix-community/naersk";
+    fenix.url = "github:nix-community/fenix";
   };
 
-  outputs = { self, nixpkgs, crate2nix, flake-utils, nix, flake-compat, serokell-nix }:
+  outputs = { self, nixpkgs, flake-utils, nix, flake-compat, serokell-nix, fenix, naersk, ... }:
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend serokell-nix.overlay;
-        crateName = "update-daemon";
-
+        naersk' = pkgs.callPackage naersk {};
         nix' = nix.defaultPackage.${system};
 
-        inherit (import "${crate2nix}/tools.nix" { inherit pkgs; })
-          generatedCargoNix;
-
-        project = import (generatedCargoNix {
-          name = crateName;
-          src = ./.;
-        }) {
-          inherit pkgs;
-          defaultCrateOverrides = pkgs.defaultCrateOverrides // {
-            # Crate dependency overrides go here
-            update-daemon = oa: {
-              nativeBuildInputs = [ pkgs.makeWrapper ];
-              postInstall =
-                "wrapProgram $out/bin/update-daemon --prefix PATH : ${
-                  pkgs.lib.makeBinPath [ nix' pkgs.gitMinimal ]
-                }";
-            };
-            # This package isn't compatible with openssl 3.0.7 for some reason
-            openssl-sys = oa : {
-              nativeBuildInputs = [ pkgs.pkg-config ];
-              buildInputs = [ pkgs.openssl_1_1 ];
-            };
+        update-daemon = naersk'.buildPackage {
+          src = builtins.path {
+            path = ./.;
+            name = "update-daemon-src";
           };
+
+          nativeBuildInputs = [
+            pkgs.pkg-config
+            pkgs.makeWrapper
+          ];
+
+          buildInputs = [
+            pkgs.openssl_1_1
+            pkgs.libgit2
+          ];
+
+          postInstall =
+            "wrapProgram $out/bin/update-daemon --prefix PATH : ${
+              pkgs.lib.makeBinPath [ nix' pkgs.gitMinimal ]
+            }";
+
+          cargoTestCommands = x: x ++ [
+            # pedantic clippy
+            ''cargo clippy --all --all-features --tests -- \
+                -D clippy::pedantic \
+                -D warnings \
+                -A clippy::module-name-repetitions \
+                -A clippy::too-many-lines \
+                -A clippy::cast-possible-wrap \
+                -A clippy::cast-possible-truncation \
+                -A clippy::nonminimal_bool''
+          ];
         };
-
       in {
-        packages.${crateName} = project.rootCrate.build;
-
-        defaultPackage = self.packages.${system}.${crateName};
+        packages = {
+          inherit update-daemon;
+          default = update-daemon;
+        };
 
         checks = {
           trailing-whitespace = pkgs.build.checkTrailingWhitespace ./.;
           reuse-lint = pkgs.build.reuseLint ./.;
+          inherit update-daemon;
         };
 
         devShell = pkgs.mkShell {
-          RUST_LOG = "trace";
+          #RUST_LOG = "trace";
           inputsFrom = builtins.attrValues self.packages.${system};
           RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
           buildInputs = with pkgs; [
@@ -71,6 +81,7 @@
             openssl_1_1
             pkg-config
             reuse
+            libgit2
           ];
         };
       }) // {

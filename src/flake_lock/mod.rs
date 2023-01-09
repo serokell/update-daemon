@@ -12,7 +12,7 @@ use thiserror::Error;
 mod tests;
 
 /// A structure representing the flake.lock file
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Lock {
     nodes: IndexMap<String, Node>,
@@ -20,7 +20,7 @@ pub struct Lock {
     root: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Node {
     flake: Option<bool>,
@@ -28,7 +28,7 @@ pub struct Node {
     inputs: Option<IndexMap<String, Input>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum Input {
     Simple(String),
@@ -37,7 +37,7 @@ pub enum Input {
 
 /// A structure representing the locked input
 // Order is important here: Git inputs also contain the narHash but shouldn't be parsed as Other
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum Locked {
     #[serde(rename_all = "camelCase")]
@@ -65,17 +65,17 @@ impl Locked {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputChange {
     Add(Locked),
     Update { old: Locked, new: Locked },
     Delete,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct LockDiff(IndexMap<String, InputChange>);
 
-#[derive(Debug, Clone, Error, PartialEq)]
+#[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum LockDiffError {
     #[error("Node {0} is in the list of inputs of node {1} but not in the lockfile")]
     MissingNodeError(String, String),
@@ -184,7 +184,7 @@ impl LockDiff {
 }
 
 fn format_date(date: i64) -> String {
-    let naive = chrono::NaiveDateTime::from_timestamp(date, 0);
+    let naive = chrono::NaiveDateTime::from_timestamp_opt(date, 0).unwrap();
 
     let datetime: chrono::DateTime<chrono::Utc> = chrono::DateTime::from_utc(naive, chrono::Utc);
 
