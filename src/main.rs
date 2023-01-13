@@ -97,15 +97,15 @@ async fn update_repo(
     let repo = UDRepo::init(state, &settings, &handle)?;
     let workdir = repo.path().unwrap();
 
-    let default_branch_lock = flake_lock::get_lock(&workdir)?;
+    let default_branch_lock = flake_lock::get_lock(workdir)?;
 
     repo.setup_update_branch(&settings)?;
 
-    let before = flake_lock::get_lock(&workdir)?;
+    let before = flake_lock::get_lock(workdir)?;
 
     flake_update(workdir)?;
 
-    let after = flake_lock::get_lock(&workdir)?;
+    let after = flake_lock::get_lock(workdir)?;
 
     let diff = before.diff(&after)?;
     let diff_default = default_branch_lock.diff(&after)?;

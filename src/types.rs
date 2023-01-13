@@ -73,6 +73,7 @@ pub struct UpdateState {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(clippy::enum_variant_names)]
 #[serde(tag = "type")]
 /// Supported repository types.
 /// All repositories are fetched and pushed using git, but pull requests are submitted differently.

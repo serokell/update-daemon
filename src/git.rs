@@ -261,7 +261,7 @@ pub fn commit(
     let mut index = repo.index().map_err(CommitError::Index)?;
 
     index
-        .add_all(&["*"], git2::IndexAddOption::DEFAULT, None)
+        .add_all(["*"], git2::IndexAddOption::DEFAULT, None)
         .map_err(CommitError::IndexAdd)?;
     index.write().map_err(CommitError::IndexWrite)?;
 
