@@ -18,6 +18,8 @@ pub struct UpdateSettings {
     pub title: String,
     pub extra_body: String,
     pub cooldown: Duration,
+    pub inputs: Vec<String>,
+    pub allow_missing_inputs: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -34,6 +36,8 @@ pub struct UpdateSettingsOptional {
     pub title: Option<String>,
     pub extra_body: Option<String>,
     pub cooldown: Option<u64>,
+    pub inputs: Option<Vec<String>>,
+    pub allow_missing_inputs: Option<bool>,
 }
 
 #[derive(Debug, Error)]
@@ -63,6 +67,8 @@ impl std::convert::TryInto<UpdateSettings> for UpdateSettingsOptional {
             extra_body: self.extra_body.unwrap_or_default(),
             // what if negative number in config?
             cooldown: Duration::from_millis(unoption(self.cooldown, "cooldown")?),
+            inputs: self.inputs.unwrap_or_else(|| vec![]),
+            allow_missing_inputs: self.allow_missing_inputs.unwrap_or_else(|| false),
         })
     }
 }

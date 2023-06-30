@@ -19,6 +19,7 @@ use serde_json::from_str;
 mod git;
 use git::UDRepo;
 mod flake_lock;
+use flake_lock::Lock;
 mod types;
 use types::*;
 mod request;
@@ -37,12 +38,31 @@ enum FlakeUpdateError {
     Utf8(#[from] std::str::Utf8Error),
     #[error("Command was terminated or exited with a non-zero status {0:?} and the following output: \n {1}")]
     ExitStatus(Option<i32>, String),
+    #[error("Input {0} is missing from the flake.lock root nodes. Check spelling or consider using the allow_missing_inputs configuration option.")]
+    MissingInput(String),
 }
 
-fn flake_update(workdir: &Path) -> Result<(), FlakeUpdateError> {
+fn flake_update(workdir: &Path, settings: &UpdateSettings, lock: &Lock) -> Result<(), FlakeUpdateError> {
     let mut nix_flake_update = Command::new("nix");
     nix_flake_update.arg("flake");
-    nix_flake_update.arg("update");
+
+    // If a list of inputs to update is not provided, update all inputs
+    if settings.inputs.is_empty() {
+        nix_flake_update.arg("update");
+    // Otherwise, update only the specified inputs
+    } else {
+        nix_flake_update.arg("lock");
+        for input in settings.inputs.iter() {
+            // Abort flake update if input is missing from the flake.lock root nodes
+            // and allow_missing_inputs is not set
+            if !settings.allow_missing_inputs && lock.get_root_dep(input.clone()).is_none() {
+                return Err(FlakeUpdateError::MissingInput(input.clone()))
+            };
+            nix_flake_update.arg("--update-input");
+            nix_flake_update.arg(input);
+        };
+    };
+
     nix_flake_update.arg("--no-warn-dirty");
     nix_flake_update.current_dir(workdir.to_str().unwrap());
     let output = nix_flake_update.output()?;
@@ -103,7 +123,7 @@ async fn update_repo(
 
     let before = flake_lock::get_lock(workdir)?;
 
-    flake_update(workdir)?;
+    flake_update(workdir, &settings, &before)?;
 
     let after = flake_lock::get_lock(workdir)?;
 

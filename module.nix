@@ -96,6 +96,17 @@ in {
           description = "Cooldown duration between updating pull requests (in milliseconds)";
           default = 100;
         };
+        inputs = mkOption {
+          type = listOf str;
+          description = "List of input names to be updated, if empty, all inputs will be updated";
+          default = [];
+          example = [ "haskell-nix" ];
+        };
+        allow_missing_inputs = mkOption {
+          type = bool;
+          description = "If set to true, the update-daemon will not abort flake update if one of the names specified in the inputs option is not present in the flake.lock root node";
+          default = false;
+        };
       };
     };
   config = lib.mkIf cfg.enable {
