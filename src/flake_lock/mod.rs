@@ -115,7 +115,7 @@ impl Lock {
         self.nodes.get(&self.resolve_input(dep)?)?.locked.clone()
     }
 
-    fn get_root_dep(&self, name: String) -> Option<Locked> {
+    pub fn get_root_dep(&self, name: String) -> Option<Locked> {
         self.get_dep(self.root_deps()?.get(&name)?.clone())
     }
 
