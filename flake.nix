@@ -11,10 +11,9 @@
   inputs = {
     flake-compat.flake = false;
     naersk.url = "github:nix-community/naersk";
-    fenix.url = "github:nix-community/fenix";
   };
 
-  outputs = { self, nixpkgs, flake-utils, nix, flake-compat, serokell-nix, fenix, naersk, ... }:
+  outputs = { self, nixpkgs, flake-utils, nix, serokell-nix, naersk, ... }:
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend serokell-nix.overlay;
@@ -66,7 +65,7 @@
           inherit update-daemon;
         };
 
-        devShell = pkgs.mkShell {
+        devShells.default = pkgs.mkShell {
           #RUST_LOG = "trace";
           inputsFrom = builtins.attrValues self.packages.${system};
           RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
