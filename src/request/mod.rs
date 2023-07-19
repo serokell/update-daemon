@@ -47,7 +47,7 @@ pub async fn submit_or_update_request(
                 Err(e @ github::PullRequestError::ReadOnlyRepo) => {
                     warn!("{}", e);
                     Ok(())
-                },
+                }
                 Err(e) => Err(e.into()),
                 Ok(_) => Ok(()),
             }
@@ -57,17 +57,16 @@ pub async fn submit_or_update_request(
             project,
             token_env_var,
             ..
-        } => {
-            gitlab::submit_or_update_merge_request(
-                settings,
-                base_url,
-                project,
-                token_env_var,
-                diff,
-                submit,
-            )
-            .await.map_err(|e| e.into())
-        }
+        } => gitlab::submit_or_update_merge_request(
+            settings,
+            base_url,
+            project,
+            token_env_var,
+            diff,
+            submit,
+        )
+        .await
+        .map_err(|e| e.into()),
         RepoHandle::GitNone { url } => {
             warn!("Not sending a pull request for {}", url);
             Ok(())

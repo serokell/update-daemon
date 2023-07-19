@@ -24,7 +24,9 @@ impl From<octocrab::Error> for PullRequestError {
         match e {
             octocrab::Error::GitHub { ref source, .. }
                 if source.message == "Repository was archived so is read-only." =>
-                    PullRequestError::ReadOnlyRepo,
+            {
+                PullRequestError::ReadOnlyRepo
+            }
             e => PullRequestError::GithubError(e),
         }
     }

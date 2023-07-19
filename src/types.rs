@@ -59,7 +59,9 @@ impl std::convert::TryInto<UpdateSettings> for UpdateSettingsOptional {
     fn try_into(self) -> Result<UpdateSettings, Self::Error> {
         Ok(UpdateSettings {
             author: unoption(self.author, "author")?,
-            update_branch: self.update_branch.unwrap_or_else(|| "automatic-update".to_string()),
+            update_branch: self
+                .update_branch
+                .unwrap_or_else(|| "automatic-update".to_string()),
             default_branch: self.default_branch.unwrap_or_else(|| "master".to_string()),
             title: self
                 .title
