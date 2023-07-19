@@ -55,6 +55,10 @@ impl UDRepo {
     pub fn push(&self, settings: &UpdateSettings) -> Result<(), PushError> {
         push(settings, &self.repo)
     }
+
+    pub fn soft_reset_to_default(&self, settings: &UpdateSettings) -> Result<(), ResetError> {
+        soft_reset_to_default(settings, &self.repo)
+    }
 }
 
 #[derive(Debug, Error)]
@@ -77,14 +81,8 @@ pub enum InitError {
     Clone(git2::Error),
     #[error("Error finding default branch on repository: {0}")]
     FindDefaultBranch(git2::Error),
-    #[error("Error peeling to default branch commit: {0}")]
-    PeelDefaultBranchCommit(git2::Error),
-    #[error("Error setting HEAD the default branch: {0}")]
-    SetHeadToDefaultBranch(git2::Error),
-    #[error("Error resetting to default branch commit: {0}")]
-    ResetToDefaultBranchCommit(git2::Error),
-    #[error("Error force-resetting default branch to upstream default branch: {0}")]
-    SetDefaultBranch(git2::Error),
+    #[error("Error force-checking out the default branch: {0}")]
+    ForceCheckoutDefaultBranch(#[from] ForceCheckoutBranchError),
 }
 
 /// Initialize the repository:
@@ -144,27 +142,14 @@ pub fn init_repo(
     };
 
     {
-        let default_branch_commit = repo
+        let default_branch = repo
             .find_branch(
-                &format!("origin/{}", &settings.default_branch),
+                &format!("origin/{}", settings.default_branch),
                 BranchType::Remote,
             )
-            .map_err(InitError::FindDefaultBranch)?
-            .into_reference()
-            .peel_to_commit()
-            .map_err(InitError::PeelDefaultBranchCommit)?;
+            .map_err(InitError::FindDefaultBranch)?;
 
-        repo.reset(default_branch_commit.as_object(), ResetType::Hard, None)
-            .map_err(InitError::ResetToDefaultBranchCommit)?;
-
-        repo.set_head_detached(default_branch_commit.id())
-            .map_err(InitError::SetHeadToDefaultBranch)?;
-
-        repo.branch(&settings.default_branch, &default_branch_commit, true)
-            .map_err(InitError::SetDefaultBranch)?;
-
-        repo.set_head(format!("refs/heads/{}", settings.default_branch).as_str())
-            .map_err(InitError::SetHeadToDefaultBranch)?;
+        force_checkout_branch(&repo, &settings.default_branch, &default_branch)?;
     }
 
     Ok(repo)
@@ -172,20 +157,14 @@ pub fn init_repo(
 
 #[derive(Debug, Error)]
 pub enum SetupUpdateBranchError {
-    #[error("Error during a git operation: {0}")]
-    GitError(#[from] git2::Error),
     #[error("Error finding default branch on repository: {0}")]
     FindDefaultBranch(git2::Error),
-    #[error("Error peeling to default branch commit: {0}")]
-    PeelDefaultBranchCommit(git2::Error),
     #[error("Error peeling to update branch commit: {0}")]
     PeelUpdateBranchCommit(git2::Error),
-    #[error("Error creating a new branch pointing to default branch commit: {0}")]
-    BranchToUpdateBranchWithDefault(git2::Error),
-    #[error("Error setting head to update branch: {0}")]
-    SetUpdateBranchHead(git2::Error),
     #[error("There are human commits in the update branch")]
     HumanCommitsInUpdateBranch,
+    #[error("Failed to force-checkout update branch: {0}")]
+    ForceCheckoutUpdateBranch(#[from] ForceCheckoutBranchError),
 }
 
 pub fn setup_update_branch(
@@ -197,34 +176,24 @@ pub fn setup_update_branch(
         BranchType::Remote,
     );
 
-    if let Ok(b) = update_branch {
-        if b.into_reference()
+    let branch = if let Ok(b) = update_branch {
+        let update_branch_commit = b
+            .get()
             .peel_to_commit()
-            .map_err(SetupUpdateBranchError::PeelUpdateBranchCommit)?
-            .author()
-            .email()
-            != Some(&settings.author.email)
-        {
+            .map_err(SetupUpdateBranchError::PeelUpdateBranchCommit)?;
+        if update_branch_commit.author().email() != Some(&settings.author.email) {
             return Err(SetupUpdateBranchError::HumanCommitsInUpdateBranch);
         }
-    }
-
-    let default_branch_commit = repo
-        .find_branch(
+        b
+    } else {
+        repo.find_branch(
             &format!("origin/{}", &settings.default_branch),
             BranchType::Remote,
         )
         .map_err(SetupUpdateBranchError::FindDefaultBranch)?
-        .into_reference()
-        .peel_to_commit()
-        .map_err(SetupUpdateBranchError::PeelDefaultBranchCommit)?;
+    };
 
-    // TODO: handle errors we care about here?
-    repo.branch(&settings.update_branch, &default_branch_commit, true)
-        .map_err(SetupUpdateBranchError::BranchToUpdateBranchWithDefault)?;
-
-    repo.set_head(&format!("refs/heads/{}", settings.update_branch))
-        .map_err(SetupUpdateBranchError::SetUpdateBranchHead)?;
+    force_checkout_branch(repo, &settings.update_branch, &branch)?;
 
     Ok(())
 }
@@ -319,6 +288,71 @@ pub fn push(settings: &UpdateSettings, repo: &Repository) -> Result<(), PushErro
             Some(&mut push_options),
         )
         .map_err(PushError::Push)?;
+
+    Ok(())
+}
+
+#[derive(Debug, Error)]
+pub enum ResetError {
+    #[error("Error soft-resetting update branch to default: {0}")]
+    Reset(git2::Error),
+    #[error("Error finding default branch on repository: {0}")]
+    FindDefaultBranch(git2::Error),
+    #[error("Error peeling to default branch commit: {0}")]
+    PeelDefaultBranchCommit(git2::Error),
+}
+
+pub fn soft_reset_to_default(
+    settings: &UpdateSettings,
+    repo: &Repository,
+) -> Result<(), ResetError> {
+    let commit = repo
+        .find_branch(
+            &format!("origin/{}", &settings.default_branch),
+            BranchType::Remote,
+        )
+        .map_err(ResetError::FindDefaultBranch)?
+        .into_reference()
+        .peel_to_commit()
+        .map_err(ResetError::PeelDefaultBranchCommit)?;
+    repo.reset(commit.as_object(), ResetType::Soft, None)
+        .map_err(ResetError::Reset)?;
+    Ok(())
+}
+
+#[derive(Debug, Error)]
+pub enum ForceCheckoutBranchError {
+    #[error("Error resetting update branch: {0}")]
+    SetBranch(git2::Error),
+    #[error("Error (re)setting to update branch commit: {0}")]
+    ResetToBranchCommit(git2::Error),
+    #[error("Error setting head to update branch: {0}")]
+    SetBranchHead(git2::Error),
+    #[error("Error peeling to branch commit: {0}")]
+    PeelBranchCommit(git2::Error),
+}
+
+pub fn force_checkout_branch(
+    repo: &git2::Repository,
+    new_branch_name: &str,
+    branch: &git2::Branch<'_>,
+) -> Result<(), ForceCheckoutBranchError> {
+    let commit = branch
+        .get()
+        .peel_to_commit()
+        .map_err(ForceCheckoutBranchError::PeelBranchCommit)?;
+
+    repo.reset(commit.as_object(), ResetType::Hard, None)
+        .map_err(ForceCheckoutBranchError::ResetToBranchCommit)?;
+
+    repo.set_head_detached(commit.id())
+        .map_err(ForceCheckoutBranchError::SetBranchHead)?;
+
+    repo.branch(new_branch_name, &commit, true)
+        .map_err(ForceCheckoutBranchError::SetBranch)?;
+
+    repo.set_head(&format!("refs/heads/{}", new_branch_name))
+        .map_err(ForceCheckoutBranchError::SetBranchHead)?;
 
     Ok(())
 }
