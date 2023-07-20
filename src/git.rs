@@ -161,6 +161,8 @@ pub enum SetupUpdateBranchError {
     FindDefaultBranch(git2::Error),
     #[error("Error peeling to update branch commit: {0}")]
     PeelUpdateBranchCommit(git2::Error),
+    #[error("Error peeling to default branch commit: {0}")]
+    PeelDefaultBranchCommit(git2::Error),
     #[error("There are human commits in the update branch")]
     HumanCommitsInUpdateBranch,
     #[error("Failed to force-checkout update branch: {0}")]
@@ -176,21 +178,33 @@ pub fn setup_update_branch(
         BranchType::Remote,
     );
 
+    let default_branch = repo
+        .find_branch(
+            &format!("origin/{}", &settings.default_branch),
+            BranchType::Remote,
+        )
+        .map_err(SetupUpdateBranchError::FindDefaultBranch)?;
+
     let branch = if let Ok(b) = update_branch {
         let update_branch_commit = b
             .get()
             .peel_to_commit()
             .map_err(SetupUpdateBranchError::PeelUpdateBranchCommit)?;
-        if update_branch_commit.author().email() != Some(&settings.author.email) {
+        let default_branch_commit = default_branch
+            .get()
+            .peel_to_commit()
+            .map_err(SetupUpdateBranchError::PeelDefaultBranchCommit)?;
+        // NB: we need to handle the case of update branch even with default
+        // branch specially, otherwise we can get spurious "human commits"
+        // errors where the update branch doesn't even have commits.
+        if update_branch_commit.id() != default_branch_commit.id()
+            && update_branch_commit.author().email() != Some(&settings.author.email)
+        {
             return Err(SetupUpdateBranchError::HumanCommitsInUpdateBranch);
         }
         b
     } else {
-        repo.find_branch(
-            &format!("origin/{}", &settings.default_branch),
-            BranchType::Remote,
-        )
-        .map_err(SetupUpdateBranchError::FindDefaultBranch)?
+        default_branch
     };
 
     force_checkout_branch(repo, &settings.update_branch, &branch)?;
