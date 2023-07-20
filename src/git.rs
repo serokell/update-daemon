@@ -190,7 +190,7 @@ pub fn setup_update_branch(
             .get()
             .peel_to_commit()
             .map_err(SetupUpdateBranchError::PeelUpdateBranchCommit)?;
-        let default_branch_commit = b
+        let default_branch_commit = default_branch
             .get()
             .peel_to_commit()
             .map_err(SetupUpdateBranchError::PeelDefaultBranchCommit)?;
