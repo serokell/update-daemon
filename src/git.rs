@@ -69,6 +69,12 @@ pub enum InitError {
     SetRemoteUrl(git2::Error),
     #[error("Error finding remote for existing repository: {0}")]
     FindRemote(git2::Error),
+    #[error("Error connecting to the remote: {0}")]
+    ConnectRemote(git2::Error),
+    #[error("Error pruning: {0}")]
+    Prune(git2::Error),
+    #[error("Error disconnecting from the remote: {0}")]
+    DisconnectRemote(git2::Error),
     #[error("Error fetching default branch for existing repository: {0}")]
     FetchDefault(git2::Error),
     #[error("Error fetching update branch for existing repository: {0}")]
@@ -99,30 +105,46 @@ pub fn init_repo(
     let mut repo_dir = state.cache_dir;
     repo_dir.push(urlhash);
 
-    let mut callbacks = RemoteCallbacks::new();
-    callbacks
-        .credentials(|_url, username, _| git2::Cred::ssh_key_from_agent(username.unwrap_or("git")));
+    /// RemoteCallbacks is non-cloneable but we have to use it twice, hence this
+    /// function
+    fn callbacks<'a>() -> git2::RemoteCallbacks<'a> {
+        let mut callbacks = RemoteCallbacks::new();
+        callbacks.credentials(|_url, username, _| {
+            git2::Cred::ssh_key_from_agent(username.unwrap_or("git"))
+        });
+        callbacks
+    }
 
     let mut fetch_options = FetchOptions::new();
-    fetch_options.remote_callbacks(callbacks);
+    fetch_options.remote_callbacks(callbacks());
 
     let repo = if repo_dir.exists() {
         debug!("Repository {} found at {:?}", handle, repo_dir);
 
         let repo = Repository::open(repo_dir).map_err(InitError::OpenRepository)?;
 
-        repo.remote_set_url("origin", &url)
-            .map_err(InitError::SetRemoteUrl)?;
+        {
+            repo.remote_set_url("origin", &url)
+                .map_err(InitError::SetRemoteUrl)?;
 
-        repo.find_remote("origin")
-            .map_err(InitError::FindRemote)?
-            .fetch(&[&settings.default_branch], Some(&mut fetch_options), None)
-            .map_err(InitError::FetchDefault)?;
+            let mut remote = repo.find_remote("origin").map_err(InitError::FindRemote)?;
 
-        repo.find_remote("origin")
-            .map_err(InitError::FindRemote)?
-            .fetch(&[&settings.update_branch], Some(&mut fetch_options), None)
-            .map_err(InitError::FetchUpdate)?;
+            remote
+                .connect_auth(git2::Direction::Fetch, Some(callbacks()), None)
+                .map_err(InitError::ConnectRemote)?;
+
+            remote.prune(None).map_err(InitError::Prune)?;
+
+            remote.disconnect().map_err(InitError::DisconnectRemote)?;
+
+            remote
+                .fetch(&[&settings.default_branch], Some(&mut fetch_options), None)
+                .map_err(InitError::FetchDefault)?;
+
+            remote
+                .fetch(&[&settings.update_branch], Some(&mut fetch_options), None)
+                .map_err(InitError::FetchUpdate)?;
+        }
 
         repo
     } else {
