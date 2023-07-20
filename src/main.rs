@@ -42,7 +42,11 @@ enum FlakeUpdateError {
     MissingInput(String),
 }
 
-fn flake_update(workdir: &Path, settings: &UpdateSettings, lock: &Lock) -> Result<(), FlakeUpdateError> {
+fn flake_update(
+    workdir: &Path,
+    settings: &UpdateSettings,
+    lock: &Lock,
+) -> Result<(), FlakeUpdateError> {
     let mut nix_flake_update = Command::new("nix");
     nix_flake_update.arg("flake");
 
@@ -56,11 +60,11 @@ fn flake_update(workdir: &Path, settings: &UpdateSettings, lock: &Lock) -> Resul
             // Abort flake update if input is missing from the flake.lock root nodes
             // and allow_missing_inputs is not set
             if !settings.allow_missing_inputs && lock.get_root_dep(input.clone()).is_none() {
-                return Err(FlakeUpdateError::MissingInput(input.clone()))
+                return Err(FlakeUpdateError::MissingInput(input.clone()));
             };
             nix_flake_update.arg("--update-input");
             nix_flake_update.arg(input);
-        };
+        }
     };
 
     nix_flake_update.arg("--no-warn-dirty");
@@ -97,6 +101,8 @@ enum UpdateError {
     PushError(#[from] git::PushError),
     #[error("Error during request submission: {0}")]
     RequestError(#[from] request::RequestError),
+    #[error("Error during soft-reset: {0}")]
+    ResetError(#[from] git::ResetError),
 }
 
 async fn wait_for_delay(last_ts: Instant, delay: Duration) {
@@ -140,8 +146,9 @@ async fn update_repo(
     let delay = settings.cooldown;
 
     if diff.len() > 0 {
-        info!("{}:\n{}", handle, diff.spaced());
-        repo.commit(&settings, diff.spaced())?;
+        info!("{}:\n{}", handle, diff_default.spaced());
+        repo.soft_reset_to_default(&settings)?;
+        repo.commit(&settings, diff_default.spaced())?;
         repo.push(&settings)?;
 
         let mut locked_ts = previous_update.lock().await;
@@ -268,10 +275,7 @@ async fn main() {
             cache_dir: cache_dir.clone(),
         };
 
-        let mut settings = repo
-            .clone()
-            .settings
-            .unwrap_or_default();
+        let mut settings = repo.clone().settings.unwrap_or_default();
 
         settings.merge(config.clone().settings);
 

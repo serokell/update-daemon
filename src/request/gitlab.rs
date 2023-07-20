@@ -46,7 +46,9 @@ pub async fn submit_or_update_merge_request(
         .target_branch(&settings.default_branch)
         .source_branch(&settings.update_branch)
         .build()
-        .map_err(|_| MergeRequestError::GitlabEndpointError("building merge request".to_string()))?;
+        .map_err(|_| {
+            MergeRequestError::GitlabEndpointError("building merge request".to_string())
+        })?;
 
     let mut mr_page: Vec<gitlab::types::MergeRequest> = mr_search.query_async(&gitlab).await?;
 
@@ -57,7 +59,9 @@ pub async fn submit_or_update_merge_request(
             .title(settings.title)
             .description(body)
             .build()
-            .map_err(|_| MergeRequestError::GitlabEndpointError("building merge request".to_string()))?;
+            .map_err(|_| {
+                MergeRequestError::GitlabEndpointError("building merge request".to_string())
+            })?;
 
         let mr: gitlab::types::MergeRequest = mr_edit.query_async(&gitlab).await?;
 
@@ -70,7 +74,9 @@ pub async fn submit_or_update_merge_request(
             .title(settings.title)
             .description(body)
             .build()
-            .map_err(|_| MergeRequestError::GitlabEndpointError("creating merge request".to_string()))?;
+            .map_err(|_| {
+                MergeRequestError::GitlabEndpointError("creating merge request".to_string())
+            })?;
 
         let mr: gitlab::types::MergeRequest = mr_create.query_async(&gitlab).await?;
 
@@ -101,7 +107,9 @@ pub async fn submit_issue_or_merge_request_comment(
         .target_branch(&settings.default_branch)
         .source_branch(&settings.update_branch)
         .build()
-        .map_err(|_| MergeRequestError::GitlabEndpointError("building merge request".to_string()))?;
+        .map_err(|_| {
+            MergeRequestError::GitlabEndpointError("building merge request".to_string())
+        })?;
 
     let mut mr_page: Vec<gitlab::types::MergeRequest> = mr_search.query_async(&gitlab).await?;
 
@@ -112,15 +120,17 @@ pub async fn submit_issue_or_merge_request_comment(
             .merge_request(mr.iid.value())
             .body(body)
             .build()
-            .map_err(|_| MergeRequestError::GitlabEndpointError("building merge request note".to_string()))?;
+            .map_err(|_| {
+                MergeRequestError::GitlabEndpointError("building merge request note".to_string())
+            })?;
 
-        let _ : gitlab::types::Note = mr_note_create.query_async(&gitlab).await?;
+        let _: gitlab::types::Note = mr_note_create.query_async(&gitlab).await?;
     } else {
         // let me = crab.current().user().await?.login;
 
-        let me_query = users::CurrentUser::builder()
-            .build()
-            .map_err(|_| MergeRequestError::GitlabEndpointError("building current user".to_string()))?;
+        let me_query = users::CurrentUser::builder().build().map_err(|_| {
+            MergeRequestError::GitlabEndpointError("building current user".to_string())
+        })?;
 
         let me: gitlab::types::User = me_query.query_async(&gitlab).await?;
 
@@ -145,18 +155,22 @@ pub async fn submit_issue_or_merge_request_comment(
                 .issue(issue.iid.value())
                 .body(body)
                 .build()
-                .map_err(|_| MergeRequestError::GitlabEndpointError("creating issue".to_string()))?;
+                .map_err(|_| {
+                    MergeRequestError::GitlabEndpointError("creating issue".to_string())
+                })?;
 
-            let _ : gitlab::types::Note = issue_note_create.query_async(&gitlab).await?;
+            let _: gitlab::types::Note = issue_note_create.query_async(&gitlab).await?;
         } else {
             let issue_create = projects::issues::CreateIssue::builder()
                 .project(project)
                 .title(title)
                 .description(body)
                 .build()
-                .map_err(|_| MergeRequestError::GitlabEndpointError("creating issue".to_string()))?;
+                .map_err(|_| {
+                    MergeRequestError::GitlabEndpointError("creating issue".to_string())
+                })?;
 
-            let _ : gitlab::types::Issue = issue_create.query_async(&gitlab).await?;
+            let _: gitlab::types::Issue = issue_create.query_async(&gitlab).await?;
         }
     }
 

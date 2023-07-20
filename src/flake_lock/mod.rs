@@ -107,7 +107,7 @@ impl Lock {
                 .get(&self.root.clone())?
                 .clone()
                 .inputs
-                .unwrap_or_default()
+                .unwrap_or_default(),
         )
     }
 
@@ -123,10 +123,9 @@ impl Lock {
         let mut diff: IndexMap<String, InputChange> = IndexMap::new();
 
         for (key, input_a) in new.root_deps().ok_or(LockDiffError::MissingRootNode)? {
-            let value_a = new.get_dep(input_a).ok_or_else(|| LockDiffError::MissingNodeError(
-                key.clone(),
-                "root".to_string(),
-            ))?;
+            let value_a = new
+                .get_dep(input_a)
+                .ok_or_else(|| LockDiffError::MissingNodeError(key.clone(), "root".to_string()))?;
 
             match self.get_root_dep(key.clone()) {
                 Some(value_b) => {
