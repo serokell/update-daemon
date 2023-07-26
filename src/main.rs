@@ -58,24 +58,22 @@ fn flake_update(
         nix_flake_update.arg("lock");
         for input in settings.inputs.iter() {
             let input_name = match input {
-                UpdateOrOverrideInput::Update(input_name) => input_name,
-                UpdateOrOverrideInput::Override{input, ..} => input,
+                UpdateOrOverrideInput::Update(input_name) => {
+                    nix_flake_update.arg("--update-input");
+                    nix_flake_update.arg(input_name);
+                    input_name
+                },
+                UpdateOrOverrideInput::Override{input, override_url} => {
+                    nix_flake_update.arg("--override-input");
+                    nix_flake_update.arg(input);
+                    nix_flake_update.arg(override_url);
+                    input
+                },
             };
             // Abort flake update if input is missing from the flake.lock root nodes
             // and allow_missing_inputs is not set
             if !settings.allow_missing_inputs && lock.get_root_dep(input_name.clone()).is_none() {
                 return Err(FlakeUpdateError::MissingInput(input_name.clone()));
-            };
-            match input {
-                UpdateOrOverrideInput::Update(input_name) => {
-                    nix_flake_update.arg("--update-input");
-                    nix_flake_update.arg(input_name);
-                },
-                UpdateOrOverrideInput::Override { input, override_url} => {
-                    nix_flake_update.arg("--override-input");
-                    nix_flake_update.arg(input);
-                    nix_flake_update.arg(override_url);
-                },
             };
         }
     };
