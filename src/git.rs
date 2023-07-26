@@ -189,6 +189,8 @@ pub enum SetupUpdateBranchError {
     HumanCommitsInUpdateBranch,
     #[error("Failed to force-checkout update branch: {0}")]
     ForceCheckoutUpdateBranch(#[from] ForceCheckoutBranchError),
+    #[error("Failed to count ahead/behind for the update branch: {0}")]
+    GraphAheadBehind(git2::Error),
 }
 
 pub fn setup_update_branch(
@@ -224,7 +226,16 @@ pub fn setup_update_branch(
         {
             return Err(SetupUpdateBranchError::HumanCommitsInUpdateBranch);
         }
-        b
+        let (_ahead, behind) = repo
+            .graph_ahead_behind(update_branch_commit.id(), default_branch_commit.id())
+            .map_err(SetupUpdateBranchError::GraphAheadBehind)?;
+        if behind > 0 {
+            // update branch is outdated, reset to default, as we'll have to force-push anyway
+            default_branch
+        } else {
+            // update branch isn't outdated, so use it
+            b
+        }
     } else {
         default_branch
     };
