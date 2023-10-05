@@ -11,6 +11,16 @@ let
     lib.mapAttrsFlatten
     (owner: lib.mapAttrsFlatten (repo: settings: { inherit type owner repo settings; })))
     cfg.repos));
+  input_override = lib.types.submodule {
+    input = lib.mkOption {
+      type = lib.types.str;
+      description = "Input to override";
+    };
+    override_url = lib.mkOption {
+      type = lib.types.str;
+      description = "Input to override";
+    };
+  };
 in {
   options.services.update-daemon = with lib;
     with types; {
@@ -97,7 +107,7 @@ in {
           default = 100;
         };
         inputs = mkOption {
-          type = listOf str;
+          type = listOf (either str input_override);
           description = "List of input names to be updated, if empty, all inputs will be updated";
           default = [];
           example = [ "haskell-nix" ];

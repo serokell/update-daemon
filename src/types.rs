@@ -18,7 +18,7 @@ pub struct UpdateSettings {
     pub title: String,
     pub extra_body: String,
     pub cooldown: Duration,
-    pub inputs: Vec<String>,
+    pub inputs: Vec<UpdateOrOverrideInput>,
     pub allow_missing_inputs: bool,
     pub sign_commits: bool,
     pub signing_key: Option<String>,
@@ -38,10 +38,17 @@ pub struct UpdateSettingsOptional {
     pub title: Option<String>,
     pub extra_body: Option<String>,
     pub cooldown: Option<u64>,
-    pub inputs: Option<Vec<String>>,
+    pub inputs: Option<Vec<UpdateOrOverrideInput>>,
     pub allow_missing_inputs: Option<bool>,
     pub sign_commits: Option<bool>,
     pub signing_key: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum UpdateOrOverrideInput {
+    Update (String),
+    Override {input: String, override_url: String},
 }
 
 #[derive(Debug, Error)]
