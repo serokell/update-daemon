@@ -107,6 +107,16 @@ in {
           description = "If set to true, the update-daemon will not abort flake update if one of the names specified in the inputs option is not present in the flake.lock root node";
           default = false;
         };
+        sign_commits = mkOption {
+          type = bool;
+          description = "Whether to sign commits, the signing key must be available in gpg-agent under the root user";
+          default = false;
+        };
+        signing_key = mkOption {
+          type = nullOr str;
+          description = "Signing key ID or fingerprint, if not set, the default key will be used";
+          default = null;
+        };
       };
     };
   config = lib.mkIf cfg.enable {

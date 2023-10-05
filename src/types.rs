@@ -20,6 +20,8 @@ pub struct UpdateSettings {
     pub cooldown: Duration,
     pub inputs: Vec<String>,
     pub allow_missing_inputs: bool,
+    pub sign_commits: bool,
+    pub signing_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -38,6 +40,8 @@ pub struct UpdateSettingsOptional {
     pub cooldown: Option<u64>,
     pub inputs: Option<Vec<String>>,
     pub allow_missing_inputs: Option<bool>,
+    pub sign_commits: Option<bool>,
+    pub signing_key: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -71,6 +75,8 @@ impl std::convert::TryInto<UpdateSettings> for UpdateSettingsOptional {
             cooldown: Duration::from_millis(unoption(self.cooldown, "cooldown")?),
             inputs: self.inputs.unwrap_or_default(),
             allow_missing_inputs: self.allow_missing_inputs.unwrap_or(false),
+            sign_commits: self.sign_commits.unwrap_or(false),
+            signing_key: self.signing_key,
         })
     }
 }

@@ -4,10 +4,12 @@
 
 use git2::RemoteCallbacks;
 use git2::{BranchType, FetchOptions, PushOptions, Repository, ResetType, Signature};
+use gpgme::{Context, Protocol};
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{create_dir, remove_dir_all};
 use std::hash::{Hash, Hasher};
 use std::path::Path;
+use std::str;
 use thiserror::Error;
 
 use log::*;
@@ -265,6 +267,18 @@ pub enum CommitError {
     PeelHead(git2::Error),
     #[error("Error creating new commit: {0}")]
     Commit(git2::Error),
+    #[error("Error creating commit object: {0}")]
+    Buffer(git2::Error),
+    #[error("Error signing commit: {0}")]
+    Sign(gpgme::Error),
+    #[error("Error converting Utf8: {0}")]
+    Utf8(str::Utf8Error),
+    #[error("Error getting secret key from gpg-agent: {0}")]
+    KeyGet(gpgme::Error),
+    #[error("Error adding signer key: {0}")]
+    SignerAdd(gpgme::Error),
+    #[error("Error updating reference: {0}")]
+    ReferenceUpdate(git2::Error),
 }
 
 /// Stage all changed files and add them to index.
@@ -294,15 +308,67 @@ pub fn commit(
         .peel_to_commit()
         .map_err(CommitError::PeelHead)?;
 
-    repo.commit(
-        Some("HEAD"),
-        &author,
-        &author,
-        &format!("{}\n\n{}", settings.title, diff),
-        &tree,
-        &[parent],
-    )
-    .map_err(CommitError::Commit)?;
+    let message = format!("{}\n\n{}", settings.title, diff);
+
+    if settings.sign_commits {
+        // Create commit object
+        let commit_buf = repo.commit_create_buffer(
+            &author,
+            &author,
+            &message,
+            &tree,
+            &[parent],
+        )
+        .map_err(CommitError::Buffer)?;
+
+        let mut ctx = Context::from_protocol(Protocol::OpenPgp)
+            .map_err(CommitError::Sign)?;
+        let mut outbuf = Vec::new();
+
+        // If the configuration specifies a signing key ID or fingerprint,
+        // obtain the secret key from the gpg-agent and add it to the list of signers
+        if let Some(signing_key) = &settings.signing_key {
+            let key = ctx.get_secret_key(signing_key).map_err(CommitError::KeyGet)?;
+            ctx.add_signer(&key).map_err(CommitError::SignerAdd)?;
+        };
+
+        // Sign commit
+        ctx.set_armor(true);
+        ctx.sign_detached(&*commit_buf, &mut outbuf).map_err(CommitError::Sign)?;
+        let out = str::from_utf8(&outbuf).map_err(CommitError::Utf8)?;
+
+        let commit_content = str::from_utf8(&commit_buf)
+            .map_err(CommitError::Utf8)?
+            .to_string();
+
+        // Create a signed commit
+        let commit = repo.commit_signed(
+            &commit_content,
+            &out,
+            None,
+        )
+        .map_err(CommitError::Commit)?;
+
+        // Move HEAD to the newly created commit
+        repo.reference(
+            &format!("refs/heads/{}", &settings.update_branch),
+            commit,
+            true,
+            &message,
+        )
+        .map_err(CommitError::ReferenceUpdate)?;
+
+    } else {
+        repo.commit(
+            Some("HEAD"),
+            &author,
+            &author,
+            &message,
+            &tree,
+            &[parent],
+        )
+        .map_err(CommitError::Commit)?;
+    };
 
     Ok(())
 }
