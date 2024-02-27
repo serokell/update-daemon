@@ -312,29 +312,26 @@ pub fn commit(
 
     if settings.sign_commits {
         // Create commit object
-        let commit_buf = repo.commit_create_buffer(
-            &author,
-            &author,
-            &message,
-            &tree,
-            &[parent],
-        )
-        .map_err(CommitError::Buffer)?;
+        let commit_buf = repo
+            .commit_create_buffer(&author, &author, &message, &tree, &[parent])
+            .map_err(CommitError::Buffer)?;
 
-        let mut ctx = Context::from_protocol(Protocol::OpenPgp)
-            .map_err(CommitError::Sign)?;
+        let mut ctx = Context::from_protocol(Protocol::OpenPgp).map_err(CommitError::Sign)?;
         let mut outbuf = Vec::new();
 
         // If the configuration specifies a signing key ID or fingerprint,
         // obtain the secret key from the gpg-agent and add it to the list of signers
         if let Some(signing_key) = &settings.signing_key {
-            let key = ctx.get_secret_key(signing_key).map_err(CommitError::KeyGet)?;
+            let key = ctx
+                .get_secret_key(signing_key)
+                .map_err(CommitError::KeyGet)?;
             ctx.add_signer(&key).map_err(CommitError::SignerAdd)?;
         };
 
         // Sign commit
         ctx.set_armor(true);
-        ctx.sign_detached(&*commit_buf, &mut outbuf).map_err(CommitError::Sign)?;
+        ctx.sign_detached(&*commit_buf, &mut outbuf)
+            .map_err(CommitError::Sign)?;
         let out = str::from_utf8(&outbuf).map_err(CommitError::Utf8)?;
 
         let commit_content = str::from_utf8(&commit_buf)
@@ -342,12 +339,9 @@ pub fn commit(
             .to_string();
 
         // Create a signed commit
-        let commit = repo.commit_signed(
-            &commit_content,
-            &out,
-            None,
-        )
-        .map_err(CommitError::Commit)?;
+        let commit = repo
+            .commit_signed(&commit_content, out, None)
+            .map_err(CommitError::Commit)?;
 
         // Move HEAD to the newly created commit
         repo.reference(
@@ -357,17 +351,9 @@ pub fn commit(
             &message,
         )
         .map_err(CommitError::ReferenceUpdate)?;
-
     } else {
-        repo.commit(
-            Some("HEAD"),
-            &author,
-            &author,
-            &message,
-            &tree,
-            &[parent],
-        )
-        .map_err(CommitError::Commit)?;
+        repo.commit(Some("HEAD"), &author, &author, &message, &tree, &[parent])
+            .map_err(CommitError::Commit)?;
     };
 
     Ok(())

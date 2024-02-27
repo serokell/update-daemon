@@ -11,7 +11,7 @@ use xdg::BaseDirectories;
 use log::*;
 use thiserror::Error;
 
-use clap::Clap;
+use clap::Parser;
 
 use serde::Deserialize;
 use serde_json::from_str;
@@ -172,7 +172,7 @@ async fn update_repo(
 }
 
 /// Submit "pull requests" (currently only Github supported) with nix flake updates
-#[derive(Debug, Clap)]
+#[derive(Debug, Parser)]
 #[clap(version = "0.1.0", author = "Serokell <https://serokell.io/>")]
 struct Options {
     /// The configuration file
@@ -185,7 +185,7 @@ struct Options {
     subcmd: Option<SubCommand>,
 }
 
-#[derive(Debug, Clap)]
+#[derive(Debug, Parser)]
 #[allow(clippy::large_enum_variant)]
 enum SubCommand {
     #[clap()]
