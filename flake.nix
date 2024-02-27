@@ -32,7 +32,7 @@
           ];
 
           buildInputs = [
-            pkgs.openssl_1_1
+            pkgs.openssl
             pkgs.libgit2
             pkgs.libgpg-error
             pkgs.gpgme
@@ -79,7 +79,7 @@
             rust-analyzer
             rustfmt
             clippy
-            openssl_1_1
+            openssl
             pkg-config
             reuse
             libgit2

@@ -5,7 +5,7 @@
 use super::*;
 
 // If you add a new valid flake.lock to resources, also add it here
-const ALL_RESOURCES: &[&'static str] = &["simple_old", "simple_new"];
+const ALL_RESOURCES: &[&str] = &["simple_old", "simple_new"];
 
 use std::path::PathBuf;
 
@@ -76,8 +76,7 @@ fn link_github() {
         .get("nixpkgs")
         .unwrap()
         .link()
-        .unwrap()
-        .to_string();
+        .unwrap();
 
     let expected = "https://github.com/NixOS/nixpkgs/compare/84d74ae9c9cbed73274b8e4e00be14688ffc93fe...c601d56e19dd2ed71b23d8aa76be8437d043d4c5?expand=1".to_string();
 

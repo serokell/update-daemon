@@ -60,7 +60,7 @@ pub async fn submit_or_update_pull_request(
     // If there is a PR already, update it and be done
     if let Some(pr) = page.items.pop() {
         crab.issues(owner, repo)
-            .update(pr.number as u64)
+            .update(pr.number)
             .title(settings.title.as_str())
             .body(&body)
             .send()
@@ -116,7 +116,7 @@ pub async fn submit_issue_or_pull_request_comment(
     // If there is a PR already, comment on it
     if let Some(pr) = page.items.pop() {
         crab.issues(owner, repo)
-            .create_comment(pr.number as u64, body)
+            .create_comment(pr.number, body)
             .await?;
     } else {
         let me = crab.current().user().await?.login;
@@ -132,7 +132,7 @@ pub async fn submit_issue_or_pull_request_comment(
 
         if let Some(issue) = page.items.pop() {
             crab.issues(owner, repo)
-                .create_comment(issue.number as u64, body)
+                .create_comment(issue.number, body)
                 .await?;
         } else {
             crab.issues(owner, repo)

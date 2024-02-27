@@ -185,7 +185,8 @@ impl LockDiff {
 fn format_date(date: i64) -> String {
     let naive = chrono::NaiveDateTime::from_timestamp_opt(date, 0).unwrap();
 
-    let datetime: chrono::DateTime<chrono::Utc> = chrono::DateTime::from_utc(naive, chrono::Utc);
+    let datetime: chrono::DateTime<chrono::Utc> =
+        chrono::DateTime::from_naive_utc_and_offset(naive, chrono::Utc);
 
     datetime.format("%Y-%m-%d").to_string()
 }
@@ -316,14 +317,7 @@ impl LockDiff {
     }
 
     pub fn spaced(&self) -> String {
-        let max = self
-            .0
-            .clone()
-            .keys()
-            .into_iter()
-            .map(|l| l.len())
-            .max()
-            .unwrap_or(0);
+        let max = self.0.clone().keys().map(|l| l.len()).max().unwrap_or(0);
         let mut s = String::new();
         for (name, change) in self.0.clone() {
             let mut name = name.clone();
