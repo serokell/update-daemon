@@ -13,12 +13,12 @@
     naersk.url = "github:nix-community/naersk";
   };
 
-  outputs = { self, nixpkgs, flake-utils, nix, serokell-nix, naersk, ... }:
+  outputs = { self, nixpkgs, flake-utils, serokell-nix, naersk, ... }:
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend serokell-nix.overlay;
         naersk' = pkgs.callPackage naersk {};
-        nix' = nix.defaultPackage.${system};
+        nix = pkgs.nix;
 
         update-daemon = naersk'.buildPackage {
           src = builtins.path {
@@ -32,7 +32,7 @@
           ];
 
           buildInputs = [
-            pkgs.openssl_1_1
+            pkgs.openssl
             pkgs.libgit2
             pkgs.libgpg-error
             pkgs.gpgme
@@ -40,7 +40,7 @@
 
           postInstall =
             "wrapProgram $out/bin/update-daemon --prefix PATH : ${
-              pkgs.lib.makeBinPath [ nix' pkgs.gitMinimal ]
+              pkgs.lib.makeBinPath [ nix pkgs.gitMinimal ]
             }";
 
           cargoTestCommands = x: x ++ [
@@ -74,12 +74,12 @@
           buildInputs = with pkgs; [
             rustc
             rust.packages.stable.rustPlatform.rustLibSrc
-            nix'
+            nix
             cargo
             rust-analyzer
             rustfmt
             clippy
-            openssl_1_1
+            openssl
             pkg-config
             reuse
             libgit2
