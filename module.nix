@@ -10,12 +10,15 @@ let
   repos = lib.concatLists [ (processGitLabRepos cfg.repos.gitlab) (processGitHubRepos cfg.repos.github) ];
   processGitHubRepos = repos: lib.concatLists (lib.mapAttrsToList (owner: lib.mapAttrsToList (repo: settings: {
     type = "github";
-    inherit owner repo settings;
-  })) repos);
+    inherit owner repo;
+  } // (extractUrls settings))) repos);
   processGitLabRepos = lib.mapAttrsToList (project: settings: {
     type = "gitlab";
-    inherit project settings;
-  });
+    inherit project;
+  } // (extractUrls settings));
+  extractUrls = settings: { settings = builtins.removeAttrs settings [ "base_url" "ssh_url" ]; } //
+    (lib.optionalAttrs (settings ? base_url) {inherit (settings) base_url; } ) //
+    (lib.optionalAttrs (settings ? ssh_url) {inherit (settings) ssh_url; } );
 in {
   options.services.update-daemon = with lib;
     with types; {
