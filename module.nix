@@ -7,10 +7,18 @@ self:
 { pkgs, lib, config, ... }:
 let
   cfg = config.services.update-daemon;
-  repos = lib.concatLists (lib.concatLists(lib.mapAttrsFlatten (type:
-    lib.mapAttrsFlatten
-    (owner: lib.mapAttrsFlatten (repo: settings: { inherit type owner repo settings; })))
-    cfg.repos));
+  repos = lib.concatLists [ (processGitLabRepos cfg.repos.gitlab) (processGitHubRepos cfg.repos.github) ];
+  processGitHubRepos = repos: lib.concatLists (lib.mapAttrsToList (owner: lib.mapAttrsToList (repo: settings: {
+    type = "github";
+    inherit owner repo;
+  } // (extractUrls settings))) repos);
+  processGitLabRepos = lib.mapAttrsToList (project: settings: {
+    type = "gitlab";
+    inherit project;
+  } // (extractUrls settings));
+  extractUrls = settings: { settings = builtins.removeAttrs settings [ "base_url" "ssh_url" ]; } //
+    (lib.optionalAttrs (settings ? base_url) {inherit (settings) base_url; } ) //
+    (lib.optionalAttrs (settings ? ssh_url) {inherit (settings) ssh_url; } );
 in {
   options.services.update-daemon = with lib;
     with types; {
@@ -48,7 +56,7 @@ in {
           example = { serokell.update-daemon = { }; };
         };
         gitlab = mkOption {
-          type = attrsOf (attrsOf (attrs));
+          type = attrsOf (attrs);
           description = "Gitlab Repositories to update";
           default = { };
         };

@@ -103,7 +103,10 @@
                 enable = true;
                 secretFile = "/run/secrets/update-daemon/environment";
                 package = self.packages.x86_64-linux.update-daemon;
-                repos.github.serokell.update-daemon = { };
+                repos = {
+                  github.serokell.update-daemon = { };
+                  gitlab."tezosagora/agora" = { };
+                };
                 settings = {
                   author.email = "operations@serokell.io";
                   author.name = "Update Bot";
