@@ -5,10 +5,12 @@
 use git2::RemoteCallbacks;
 use git2::{BranchType, FetchOptions, PushOptions, Repository, ResetType, Signature};
 use gpgme::{Context, Protocol};
+use ssh2::{CheckResult, Session};
+use ssh2_config::{Field, SshConfig};
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{create_dir, remove_dir_all};
 use std::hash::{Hash, Hasher};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str;
 use thiserror::Error;
 
@@ -30,7 +32,7 @@ pub struct UDRepo {
 
 impl UDRepo {
     pub fn init(
-        state: UpdateState,
+        state: &UpdateState,
         settings: &UpdateSettings,
         handle: &RepoHandle,
     ) -> Result<UDRepo, InitError> {
@@ -54,8 +56,8 @@ impl UDRepo {
         commit(settings, &self.repo, diff)
     }
 
-    pub fn push(&self, settings: &UpdateSettings) -> Result<(), PushError> {
-        push(settings, &self.repo)
+    pub fn push(&self, state: &UpdateState, settings: &UpdateSettings) -> Result<(), PushError> {
+        push(state, settings, &self.repo)
     }
 
     pub fn soft_reset_to_default(&self, settings: &UpdateSettings) -> Result<(), ResetError> {
@@ -93,32 +95,83 @@ pub enum InitError {
     ForceCheckoutDefaultBranch(#[from] ForceCheckoutBranchError),
 }
 
+/// RemoteCallbacks is non-cloneable but we have to use it twice, hence this
+/// function
+fn callbacks(state: &UpdateState) -> git2::RemoteCallbacks {
+    let mut callbacks = RemoteCallbacks::new();
+    callbacks
+        .credentials(|_url, username, _| git2::Cred::ssh_key_from_agent(username.unwrap_or("git")))
+        .certificate_check(move |cert, host| {
+            // libgit2 only considers "~/.ssh/known_hosts" when checking the git host certificate,
+            // see https://github.com/libgit2/libgit2/blob/115db540cfb633c2a618aa60757454839047eadf/src/libgit2/transports/ssh_libssh2.c#L435
+            // However, NixOS tend to have 'GlobalKnownHostsFile' in '/etc/ssh/config' that may point
+            // to files in '/nix/store', and additionally, home-manager may set 'UserKnownHostsFile' in
+            // ~/.ssh/config.
+            // We need to make sure that 'certificate_check' callback checks these files.
+            let Some(hostkey) = cert.as_hostkey().and_then(git2::cert::CertHostkey::hostkey) else {
+                return Ok(git2::CertificateCheckStatus::CertificatePassthrough);
+            };
+            // Check local ssh config;
+            let get_host_files_from_field = |f: Field, c: &Option<SshConfig>| -> Vec<String> {
+                let Some(ref conf) = c else {
+                    return Vec::new();
+                };
+                let mut host_params = conf.query(host);
+                // NB: we own host_params, hence we can safely take out the field
+                // value instead of cloning it
+                host_params.ignored_fields.remove(&f).unwrap_or_default()
+            };
+            let known_hosts_files =
+                get_host_files_from_field(Field::UserKnownHostsFile, &state.local_ssh_config)
+                    .into_iter()
+                    .chain(get_host_files_from_field(
+                        Field::GlobalKnownHostsFile,
+                        &state.global_ssh_config,
+                    ));
+            fn mk_err(err_msg: impl AsRef<str>) -> git2::Error {
+                git2::Error::new(
+                    git2::ErrorCode::GenericError,
+                    git2::ErrorClass::Callback,
+                    err_msg,
+                )
+            }
+            let sess = Session::new()
+                .map_err(|err| mk_err(format!("Failed to initialize SSH session {err}")))?;
+            let mut known_hosts = sess
+                .known_hosts()
+                .map_err(|err| mk_err(format!("Failed to load known hosts {err}")))?;
+            for known_host_file in known_hosts_files {
+                let _ = known_hosts.read_file(
+                    &PathBuf::from(known_host_file),
+                    ssh2::KnownHostFileKind::OpenSSH,
+                );
+            }
+            match known_hosts.check(host, hostkey) {
+                CheckResult::Match => Ok(git2::CertificateCheckStatus::CertificateOk),
+                CheckResult::NotFound => Ok(git2::CertificateCheckStatus::CertificatePassthrough),
+                CheckResult::Failure => Err(mk_err("Something prevented the host check")),
+                CheckResult::Mismatch => Err(mk_err("Host was found, but the keys didn't match")),
+            }
+        });
+    callbacks
+}
+
 /// Initialize the repository:
 /// If there is a repository cloned from the same URL, open it,
 /// Otherwise clone it.
 /// Reset the local default branch to the upstream one.
 pub fn init_repo(
-    state: UpdateState,
+    state: &UpdateState,
     settings: &UpdateSettings,
     handle: &RepoHandle,
 ) -> Result<Repository, InitError> {
     let url = handle.to_string();
     let urlhash = calculate_hash(&url);
-    let mut repo_dir = state.cache_dir;
+    let mut repo_dir = state.cache_dir.clone();
     repo_dir.push(urlhash);
 
-    /// RemoteCallbacks is non-cloneable but we have to use it twice, hence this
-    /// function
-    fn callbacks<'a>() -> git2::RemoteCallbacks<'a> {
-        let mut callbacks = RemoteCallbacks::new();
-        callbacks.credentials(|_url, username, _| {
-            git2::Cred::ssh_key_from_agent(username.unwrap_or("git"))
-        });
-        callbacks
-    }
-
     let mut fetch_options = FetchOptions::new();
-    fetch_options.remote_callbacks(callbacks());
+    fetch_options.remote_callbacks(callbacks(state));
 
     let repo = if repo_dir.exists() {
         debug!("Repository {} found at {:?}", handle, repo_dir);
@@ -132,7 +185,7 @@ pub fn init_repo(
             let mut remote = repo.find_remote("origin").map_err(InitError::FindRemote)?;
 
             remote
-                .connect_auth(git2::Direction::Fetch, Some(callbacks()), None)
+                .connect_auth(git2::Direction::Fetch, Some(callbacks(state)), None)
                 .map_err(InitError::ConnectRemote)?;
 
             remote.prune(None).map_err(InitError::Prune)?;
@@ -368,15 +421,15 @@ pub enum PushError {
 }
 
 /// Push the changes to the `origin` remote.
-pub fn push(settings: &UpdateSettings, repo: &Repository) -> Result<(), PushError> {
+pub fn push(
+    state: &UpdateState,
+    settings: &UpdateSettings,
+    repo: &Repository,
+) -> Result<(), PushError> {
     let mut remote = repo.find_remote("origin").map_err(PushError::FindRemote)?;
 
-    let mut callbacks = RemoteCallbacks::new();
-    callbacks
-        .credentials(|_url, username, _| git2::Cred::ssh_key_from_agent(username.unwrap_or("git")));
-
     let mut push_options = PushOptions::new();
-    push_options.remote_callbacks(callbacks);
+    push_options.remote_callbacks(callbacks(state));
     remote
         .push(
             //         ↓ force-push

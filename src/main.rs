@@ -2,8 +2,11 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
+use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
 
+use ssh2_config::SshConfig;
 use std::process::Command;
 use std::sync::Arc;
 use xdg::BaseDirectories;
@@ -114,7 +117,7 @@ async fn wait_for_delay(last_ts: Instant, delay: Duration) {
 
 async fn update_repo(
     handle: RepoHandle,
-    state: UpdateState,
+    state: &UpdateState,
     settings: UpdateSettings,
     previous_update: Arc<TMutex<Instant>>,
 ) -> Result<(), UpdateError> {
@@ -149,7 +152,7 @@ async fn update_repo(
         info!("{}:\n{}", handle, diff_default.spaced());
         repo.soft_reset_to_default(&settings)?;
         repo.commit(&settings, diff_default.spaced())?;
-        repo.push(&settings)?;
+        repo.push(state, &settings)?;
 
         let mut locked_ts = previous_update.lock().await;
         wait_for_delay(*locked_ts, delay).await;
@@ -159,7 +162,7 @@ async fn update_repo(
     } else {
         info!("{}: Nothing to update", handle);
         if diff_default.len() > 0 {
-            repo.push(&settings)?;
+            repo.push(state, &settings)?;
 
             let mut locked_ts = previous_update.lock().await;
             wait_for_delay(*locked_ts, delay).await;
@@ -214,6 +217,31 @@ where
     })
 }
 
+fn init_update_state() -> UpdateState {
+    let global_ssh_config =
+        File::open("/etc/ssh/ssh_config")
+            .ok()
+            .and_then(|global_ssh_config_file| {
+                SshConfig::default()
+                    .parse(
+                        &mut BufReader::new(global_ssh_config_file),
+                        ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS,
+                    )
+                    .ok()
+            });
+    let local_ssh_config =
+        SshConfig::parse_default_file(ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS).ok();
+    let cache_dir = BaseDirectories::new()
+        .unwrap()
+        .create_cache_directory("update-daemon")
+        .unwrap_or_else(good_panic("Failed to create a cache directory", 77));
+    UpdateState {
+        cache_dir,
+        global_ssh_config,
+        local_ssh_config,
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let options: Options = Options::parse();
@@ -234,9 +262,6 @@ async fn main() {
     }
 
     let xdg = BaseDirectories::new().unwrap();
-    let cache_dir = xdg
-        .create_cache_directory("update-daemon")
-        .unwrap_or_else(good_panic("Failed to create a cache directory", 77));
     let config_file = xdg.find_config_file("update-daemon/config.json");
 
     let config: Config = from_str(
@@ -269,12 +294,10 @@ async fn main() {
 
     let ts = Arc::new(TMutex::new(Instant::now()));
     let mut handles = Vec::new();
+    // For the sake of efficient memory usage 'UpdateState' is created only once
+    let state = Arc::new(init_update_state());
 
     for repo in config.clone().repos {
-        let state = UpdateState {
-            cache_dir: cache_dir.clone(),
-        };
-
         let mut settings = repo.clone().settings.unwrap_or_default();
 
         settings.merge(config.clone().settings);
@@ -283,6 +306,7 @@ async fn main() {
 
         let ts_copy1 = Arc::clone(&ts);
         let ts_copy2 = Arc::clone(&ts);
+        let state = Arc::clone(&state);
         let handle = tokio::spawn(async move {
             match settings.try_into() {
                 Err(e) => {
@@ -291,7 +315,7 @@ async fn main() {
                 }
                 Ok(settings) => match update_repo(
                     repo.handle.clone(),
-                    state,
+                    &state,
                     (&settings as &UpdateSettings).clone(),
                     ts_copy1,
                 )

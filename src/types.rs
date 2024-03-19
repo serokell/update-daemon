@@ -4,6 +4,7 @@
 
 use merge::Merge;
 use serde::Deserialize;
+use ssh2_config::SshConfig;
 use std::default::Default;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
@@ -81,9 +82,11 @@ impl std::convert::TryInto<UpdateSettings> for UpdateSettingsOptional {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Clone)]
 pub struct UpdateState {
     pub cache_dir: PathBuf,
+    pub global_ssh_config: Option<SshConfig>,
+    pub local_ssh_config: Option<SshConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
