@@ -30,7 +30,7 @@ pub struct UDRepo {
 
 impl UDRepo {
     pub fn init(
-        state: UpdateState,
+        state: &UpdateState,
         settings: &UpdateSettings,
         handle: &RepoHandle,
     ) -> Result<UDRepo, InitError> {
@@ -98,13 +98,13 @@ pub enum InitError {
 /// Otherwise clone it.
 /// Reset the local default branch to the upstream one.
 pub fn init_repo(
-    state: UpdateState,
+    state: &UpdateState,
     settings: &UpdateSettings,
     handle: &RepoHandle,
 ) -> Result<Repository, InitError> {
     let url = handle.to_string();
     let urlhash = calculate_hash(&url);
-    let mut repo_dir = state.cache_dir;
+    let mut repo_dir = state.cache_dir.clone();
     repo_dir.push(urlhash);
 
     /// RemoteCallbacks is non-cloneable but we have to use it twice, hence this

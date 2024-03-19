@@ -81,7 +81,6 @@ impl std::convert::TryInto<UpdateSettings> for UpdateSettingsOptional {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
 pub struct UpdateState {
     pub cache_dir: PathBuf,
 }

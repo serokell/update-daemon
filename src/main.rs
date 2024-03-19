@@ -114,7 +114,7 @@ async fn wait_for_delay(last_ts: Instant, delay: Duration) {
 
 async fn update_repo(
     handle: RepoHandle,
-    state: UpdateState,
+    state: &UpdateState,
     settings: UpdateSettings,
     previous_update: Arc<TMutex<Instant>>,
 ) -> Result<(), UpdateError> {
@@ -269,12 +269,11 @@ async fn main() {
 
     let ts = Arc::new(TMutex::new(Instant::now()));
     let mut handles = Vec::new();
+    let state = UpdateState {
+        cache_dir: cache_dir.clone(),
+    };
 
     for repo in config.clone().repos {
-        let state = UpdateState {
-            cache_dir: cache_dir.clone(),
-        };
-
         let mut settings = repo.clone().settings.unwrap_or_default();
 
         settings.merge(config.clone().settings);
@@ -291,7 +290,7 @@ async fn main() {
                 }
                 Ok(settings) => match update_repo(
                     repo.handle.clone(),
-                    state,
+                    &state,
                     (&settings as &UpdateSettings).clone(),
                     ts_copy1,
                 )
