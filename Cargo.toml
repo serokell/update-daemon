@@ -27,3 +27,9 @@ chrono = "0.4"
 indexmap = { version = "1.9", features = [ "serde", "serde-1" ] }
 merge = "0.1"
 gpgme = "0.10.0"
+ssh2 = "0.9"
+ssh2-config = "0.2"
+
+# Remove once changes appear in upstream and the new crate version is released
+[patch.crates-io]
+ssh2-config = { git = "https://github.com/serokell/ssh2-config.git", branch = "rvem/populate-ignored-fields-with-ignored-instead-of-unparsed" }
