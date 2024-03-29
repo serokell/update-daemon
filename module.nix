@@ -146,6 +146,14 @@ in {
       path = [ cfg.package ];
       script = ''
         ${cfg.agentSetup}
+
+        # Provide GITHUB_TOKEN to nix to avoid API rate limits
+        if [[ $GITHUB_TOKEN ]]; then
+          export NIX_CONFIG="extra-access-tokens = github.com=$GITHUB_TOKEN"
+        else
+          echo "GITHUB_TOKEN is not set, you may encounter GitHub API rate limits"
+        fi
+
         update-daemon ${
           builtins.toFile "config.json"
           (builtins.toJSON (cfg.settings // { repos = repos ++ cfg.extraRepos; }))
