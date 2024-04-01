@@ -128,11 +128,20 @@ in {
       };
     };
   config = lib.mkIf cfg.enable {
+    users.users.update-daemon = {
+      isSystemUser = true;
+      home = "/var/lib/update-daemon";
+      createHome = true;
+      group = "update-daemon";
+    };
+    users.groups.update-daemon = {};
+
     systemd.services.update-daemon = {
       description = "A daemon to update nix flakes";
       serviceConfig = {
         Type = "oneshot";
         EnvironmentFile = cfg.secretFile;
+        User = "update-daemon";
       };
       path = [ cfg.package ];
       script = ''
