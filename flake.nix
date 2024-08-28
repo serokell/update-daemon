@@ -11,14 +11,15 @@
   inputs = {
     flake-compat.flake = false;
     naersk.url = "github:nix-community/naersk";
+    nix.url = "github:nixos/nix?ref=2.21.4";
   };
 
-  outputs = { self, nixpkgs, flake-utils, serokell-nix, naersk, ... }:
+  outputs = { self, nixpkgs, flake-utils, serokell-nix, naersk, ... }@inputs:
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let
         pkgs = nixpkgs.legacyPackages.${system}.extend serokell-nix.overlay;
         naersk' = pkgs.callPackage naersk {};
-        nix = pkgs.nix;
+        nix = inputs.nix.packages.${system}.nix;
 
         update-daemon = naersk'.buildPackage {
           src = builtins.path {

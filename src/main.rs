@@ -51,21 +51,16 @@ fn flake_update(
     lock: &Lock,
 ) -> Result<(), FlakeUpdateError> {
     let mut nix_flake_update = Command::new("nix");
-    nix_flake_update.arg("flake");
+    nix_flake_update.arg("flake").arg("update");
 
-    // If a list of inputs to update is not provided, update all inputs
-    if settings.inputs.is_empty() {
-        nix_flake_update.arg("update");
-    // Otherwise, update only the specified inputs
-    } else {
-        nix_flake_update.arg("lock");
+    // If a list of inputs to update is provided, update only the specified inputs
+    if !settings.inputs.is_empty() {
         for input in settings.inputs.iter() {
             // Abort flake update if input is missing from the flake.lock root nodes
             // and allow_missing_inputs is not set
             if !settings.allow_missing_inputs && lock.get_root_dep(input.clone()).is_none() {
                 return Err(FlakeUpdateError::MissingInput(input.clone()));
             };
-            nix_flake_update.arg("--update-input");
             nix_flake_update.arg(input);
         }
     };
