@@ -757,6 +757,21 @@
         "type": "github"
       }
     },
+    "nixos-nixpkgs": {
+      "locked": {
+        "lastModified": 1724956629,
+        "narHash": "sha256-ZX4gCiRd9VnfDDetgu02VIYvPTBPvfzNK53OJ3aGab0=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "cc223bad7ef2ad0ac4c2db75136864233e40465b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1714555275,
@@ -1042,6 +1057,7 @@
         "flake-compat": "flake-compat",
         "flake-utils": "flake-utils",
         "naersk": "naersk",
+        "nixos-nixpkgs": "nixos-nixpkgs",
         "nixpkgs": "nixpkgs_2",
         "serokell-nix": "serokell-nix"
       }
