@@ -3,7 +3,10 @@
 # SPDX-License-Identifier: MPL-2.0
 
 name: nix flake check
-on: push
+on:
+  pull_request:
+  push:
+    branches: master
 
 jobs:
   check:
