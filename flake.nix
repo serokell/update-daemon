@@ -12,13 +12,36 @@
     flake-compat.flake = false;
     naersk.url = "github:nix-community/naersk";
     nix.url = "github:nixos/nix?ref=2.21.4";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, serokell-nix, naersk, ... }@inputs:
+  outputs = { self, nixpkgs, flake-utils, serokell-nix, naersk, rust-overlay, ... }@inputs:
     flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let
-        pkgs = nixpkgs.legacyPackages.${system}.extend serokell-nix.overlay;
-        naersk' = pkgs.callPackage naersk {};
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [
+            serokell-nix.overlay
+            rust-overlay.overlays.default
+          ];
+        };
+        rustChannel = (pkgs.rust-bin.fromRustupToolchain { channel = "1.77.1"; }).override({
+          extensions = [
+            "clippy"
+            "rust-analysis"
+            "rust-analyzer"
+            "rust-docs"
+            "rust-src"
+            "rustfmt"
+          ];
+        });
+        naersk' = pkgs.callPackage naersk {
+          rustc = rustChannel;
+          cargo = rustChannel;
+        };
         nix = inputs.nix.packages.${system}.nix;
 
         update-daemon = naersk'.buildPackage {
@@ -71,15 +94,9 @@
         devShells.default = pkgs.mkShell {
           #RUST_LOG = "trace";
           inputsFrom = builtins.attrValues self.packages.${system};
-          RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
           buildInputs = with pkgs; [
-            rustc
-            rust.packages.stable.rustPlatform.rustLibSrc
+            rustChannel
             nix
-            cargo
-            rust-analyzer
-            rustfmt
-            clippy
             openssl
             pkg-config
             reuse
