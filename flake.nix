@@ -11,7 +11,7 @@
   inputs = {
     flake-compat.flake = false;
     naersk.url = "github:nix-community/naersk";
-    nix.url = "github:nixos/nix?ref=2.21.4";
+    nix.url = "github:nixos/nix?ref=2.32.4";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
