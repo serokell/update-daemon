@@ -1136,11 +1136,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1781258734,
-        "narHash": "sha256-rfZT1gFztHDqA4gcFLO/Qv74bulhW/mXYqIHYTmc1lA=",
+        "lastModified": 1782220280,
+        "narHash": "sha256-thLTFbp9D5Qknmh8q/v4FRpLGphUSijT3E86cbLYTXo=",
         "owner": "nix-community",
         "repo": "naersk",
-        "rev": "3ddafa67a4c7d06483995c85c66a2d285b738833",
+        "rev": "9aa07bb0256d300219b30622d2454e85f7f3667e",
         "type": "github"
       },
       "original": {
@@ -1887,11 +1887,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1781666412,
-        "narHash": "sha256-Tzgol+o9+V4lK99r4AERI4pyFoZwg6Si2xUd1wc/WQU=",
+        "lastModified": 1782616745,
+        "narHash": "sha256-NN5B1cKBXF6h1Ec681gMGZ2o/99d7vKXAAfFNEvyOKA=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "d0e019d9543f0f1215a3d961fc4dca59aa29c638",
+        "rev": "b916d014dc57eb555f84e51172a82f7f6fb560d7",
         "type": "github"
       },
       "original": {
@@ -1913,11 +1913,11 @@
         "weeder-src": "weeder-src"
       },
       "locked": {
-        "lastModified": 1781186548,
-        "narHash": "sha256-wd3ZejDr8SEnUeBTQqEINRLVR96xjVfW4DCwA2Yzz/k=",
+        "lastModified": 1782256513,
+        "narHash": "sha256-cG5GzN9rjFMku82m4bYRkmYOMIoIyU/6fuzB3Nqm2ns=",
         "owner": "serokell",
         "repo": "serokell.nix",
-        "rev": "842f47104adb64a0430291e762ff9b2aeec7141f",
+        "rev": "8371612e4d7200d385918ec23770ccd7c3ca6744",
         "type": "github"
       },
       "original": {
