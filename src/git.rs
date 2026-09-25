@@ -6,7 +6,7 @@ use git2::RemoteCallbacks;
 use git2::{BranchType, FetchOptions, PushOptions, Repository, ResetType, Signature};
 use gpgme::{Context, Protocol};
 use ssh2::{CheckResult, Session};
-use ssh2_config::{Field, SshConfig};
+use ssh2_config::SshConfig;
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{create_dir, remove_dir_all};
 use std::hash::{Hash, Hasher};
@@ -119,20 +119,21 @@ fn callbacks(state: &UpdateState) -> git2::RemoteCallbacks {
                 return Ok(git2::CertificateCheckStatus::CertificatePassthrough);
             };
             // Check local ssh config;
-            let get_host_files_from_field = |f: Field, c: &Option<SshConfig>| -> Vec<String> {
+            // ssh2-config stores these under their lowercased names in `unsupported_fields`
+            let get_host_files_from_field = |f: &str, c: &Option<SshConfig>| -> Vec<String> {
                 let Some(ref conf) = c else {
                     return Vec::new();
                 };
                 let mut host_params = conf.query(host);
                 // NB: we own host_params, hence we can safely take out the field
                 // value instead of cloning it
-                host_params.ignored_fields.remove(&f).unwrap_or_default()
+                host_params.unsupported_fields.remove(f).unwrap_or_default()
             };
             let known_hosts_files =
-                get_host_files_from_field(Field::UserKnownHostsFile, &state.local_ssh_config)
+                get_host_files_from_field("userknownhostsfile", &state.local_ssh_config)
                     .into_iter()
                     .chain(get_host_files_from_field(
-                        Field::GlobalKnownHostsFile,
+                        "globalknownhostsfile",
                         &state.global_ssh_config,
                     ));
             let sess = Session::new()
