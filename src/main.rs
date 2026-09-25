@@ -223,12 +223,18 @@ fn init_update_state() -> UpdateState {
                         ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS
                             | ssh2_config::ParseRule::ALLOW_UNSUPPORTED_FIELDS,
                     )
+                    .inspect_err(|err| warn!("Ignoring /etc/ssh/ssh_config: {err}"))
                     .ok()
             });
     let local_ssh_config = SshConfig::parse_default_file(
         ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS
             | ssh2_config::ParseRule::ALLOW_UNSUPPORTED_FIELDS,
     )
+    .inspect_err(|err| match err {
+        ssh2_config::SshParserError::Io(io_err)
+            if io_err.kind() == std::io::ErrorKind::NotFound => {}
+        _ => warn!("Ignoring ~/.ssh/config: {err}"),
+    })
     .ok();
     let cache_dir = BaseDirectories::new()
         .unwrap()
