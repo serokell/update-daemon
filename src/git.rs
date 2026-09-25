@@ -52,7 +52,7 @@ impl UDRepo {
         setup_update_branch(settings, &self.repo)
     }
 
-    pub fn commit(&self, settings: &UpdateSettings, diff: String) -> Result<(), CommitError> {
+    pub fn commit(&self, settings: &UpdateSettings, diff: &str) -> Result<(), CommitError> {
         commit(settings, &self.repo, diff)
     }
 
@@ -95,13 +95,20 @@ pub enum InitError {
     ForceCheckoutDefaultBranch(#[from] ForceCheckoutBranchError),
 }
 
-/// RemoteCallbacks is non-cloneable but we have to use it twice, hence this
+/// `RemoteCallbacks` is non-cloneable but we have to use it twice, hence this
 /// function
 fn callbacks(state: &UpdateState) -> git2::RemoteCallbacks {
     let mut callbacks = RemoteCallbacks::new();
     callbacks
         .credentials(|_url, username, _| git2::Cred::ssh_key_from_agent(username.unwrap_or("git")))
         .certificate_check(move |cert, host| {
+            fn mk_err(err_msg: impl AsRef<str>) -> git2::Error {
+                git2::Error::new(
+                    git2::ErrorCode::GenericError,
+                    git2::ErrorClass::Callback,
+                    err_msg,
+                )
+            }
             // libgit2 only considers "~/.ssh/known_hosts" when checking the git host certificate,
             // see https://github.com/libgit2/libgit2/blob/115db540cfb633c2a618aa60757454839047eadf/src/libgit2/transports/ssh_libssh2.c#L435
             // However, NixOS tend to have 'GlobalKnownHostsFile' in '/etc/ssh/config' that may point
@@ -128,13 +135,6 @@ fn callbacks(state: &UpdateState) -> git2::RemoteCallbacks {
                         Field::GlobalKnownHostsFile,
                         &state.global_ssh_config,
                     ));
-            fn mk_err(err_msg: impl AsRef<str>) -> git2::Error {
-                git2::Error::new(
-                    git2::ErrorCode::GenericError,
-                    git2::ErrorClass::Callback,
-                    err_msg,
-                )
-            }
             let sess = Session::new()
                 .map_err(|err| mk_err(format!("Failed to initialize SSH session {err}")))?;
             let mut known_hosts = sess
@@ -336,11 +336,7 @@ pub enum CommitError {
 
 /// Stage all changed files and add them to index.
 /// `diff` is going to be the commit message.
-pub fn commit(
-    settings: &UpdateSettings,
-    repo: &Repository,
-    diff: String,
-) -> Result<(), CommitError> {
+pub fn commit(settings: &UpdateSettings, repo: &Repository, diff: &str) -> Result<(), CommitError> {
     let mut index = repo.index().map_err(CommitError::Index)?;
 
     index
@@ -379,7 +375,7 @@ pub fn commit(
                 .get_secret_key(signing_key)
                 .map_err(CommitError::KeyGet)?;
             ctx.add_signer(&key).map_err(CommitError::SignerAdd)?;
-        };
+        }
 
         // Sign commit
         ctx.set_armor(true);
@@ -407,7 +403,7 @@ pub fn commit(
     } else {
         repo.commit(Some("HEAD"), &author, &author, &message, &tree, &[parent])
             .map_err(CommitError::Commit)?;
-    };
+    }
 
     Ok(())
 }
@@ -503,7 +499,7 @@ pub fn force_checkout_branch(
     repo.branch(new_branch_name, &commit, true)
         .map_err(ForceCheckoutBranchError::SetBranch)?;
 
-    repo.set_head(&format!("refs/heads/{}", new_branch_name))
+    repo.set_head(&format!("refs/heads/{new_branch_name}"))
         .map_err(ForceCheckoutBranchError::SetBranchHead)?;
 
     Ok(())

@@ -153,9 +153,9 @@ impl Display for RepoHandle {
                 )?;
             }
             RepoHandle::GitNone { url, .. } => {
-                write!(f, "{}", url)?;
+                write!(f, "{url}")?;
             }
-        };
+        }
         Ok(())
     }
 }
