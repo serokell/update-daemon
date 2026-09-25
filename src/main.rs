@@ -212,24 +212,32 @@ where
     })
 }
 
+/// Parses the SSH config at `path`. Returns `None` if the path doesn't
+/// exist, can't be opened, or can't be parsed. A missing path is silent;
+/// any other failure is logged and the config is ignored.
+fn parse_ssh_config_if_exists(path: &Path) -> Option<SshConfig> {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(err) => {
+            warn!("Ignoring {}: {err}", path.display());
+            return None;
+        }
+    };
+    SshConfig::default()
+        .parse(
+            &mut BufReader::new(file),
+            ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS
+                | ssh2_config::ParseRule::ALLOW_UNSUPPORTED_FIELDS,
+        )
+        .inspect_err(|err| warn!("Ignoring {}: {err}", path.display()))
+        .ok()
+}
+
 fn init_update_state() -> UpdateState {
-    let global_ssh_config =
-        File::open("/etc/ssh/ssh_config")
-            .ok()
-            .and_then(|global_ssh_config_file| {
-                SshConfig::default()
-                    .parse(
-                        &mut BufReader::new(global_ssh_config_file),
-                        ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS
-                            | ssh2_config::ParseRule::ALLOW_UNSUPPORTED_FIELDS,
-                    )
-                    .ok()
-            });
-    let local_ssh_config = SshConfig::parse_default_file(
-        ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS
-            | ssh2_config::ParseRule::ALLOW_UNSUPPORTED_FIELDS,
-    )
-    .ok();
+    let global_ssh_config = parse_ssh_config_if_exists(Path::new("/etc/ssh/ssh_config"));
+    let local_ssh_config =
+        std::env::home_dir().and_then(|home| parse_ssh_config_if_exists(&home.join(".ssh/config")));
     let cache_dir = BaseDirectories::new()
         .unwrap()
         .create_cache_directory("update-daemon")
