@@ -28,7 +28,7 @@
             rust-overlay.overlays.default
           ];
         };
-        rustChannel = (pkgs.rust-bin.fromRustupToolchain { channel = "1.77.1"; }).override({
+        rustChannel = (pkgs.rust-bin.fromRustupToolchain { channel = "1.88.0"; }).override({
           extensions = [
             "clippy"
             "rust-analysis"
