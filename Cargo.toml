@@ -28,6 +28,6 @@ futures = "0.3"
 chrono = "0.4"
 indexmap = { version = "1.9", features = [ "serde", "serde-1" ] }
 merge = "0.1"
-gpgme = "0.10.0"
+gpgme = "0.11"
 ssh2 = "0.9"
 ssh2-config = "0.8"
