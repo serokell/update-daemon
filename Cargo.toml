@@ -7,6 +7,7 @@ name = "update-daemon"
 version = "0.1.0"
 authors = ["Serokell <hi@serokell.io>"]
 edition = "2018"
+resolver = "3"
 rust-version = "1.88"
 description = "Nix Flake Update daemon"
 license = "MPL-2.0"
