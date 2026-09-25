@@ -220,12 +220,16 @@ fn init_update_state() -> UpdateState {
                 SshConfig::default()
                     .parse(
                         &mut BufReader::new(global_ssh_config_file),
-                        ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS,
+                        ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS
+                            | ssh2_config::ParseRule::ALLOW_UNSUPPORTED_FIELDS,
                     )
                     .ok()
             });
-    let local_ssh_config =
-        SshConfig::parse_default_file(ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS).ok();
+    let local_ssh_config = SshConfig::parse_default_file(
+        ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS
+            | ssh2_config::ParseRule::ALLOW_UNSUPPORTED_FIELDS,
+    )
+    .ok();
     let cache_dir = BaseDirectories::new()
         .unwrap()
         .create_cache_directory("update-daemon")
