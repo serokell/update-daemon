@@ -14,7 +14,7 @@ rust-version = "1.88"
 
 [dependencies]
 git2 = "0.18"
-octocrab = "0.18.1"
+octocrab = "0.19"
 gitlab = "0.1506.0"
 log = "0.4.20"
 pretty_env_logger = "0.4.0"
