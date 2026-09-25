@@ -67,6 +67,7 @@
               pkgs.lib.makeBinPath [ nix pkgs.gitMinimal ]
             }";
 
+          doCheck = true;
           cargoTestCommands = x: x ++ [
             # pedantic clippy
             ''cargo clippy --all --all-features --tests -- \
