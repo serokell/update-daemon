@@ -45,7 +45,7 @@ pub async fn submit_or_update_request(
             .await;
             match res {
                 Err(e @ github::PullRequestError::ReadOnlyRepo) => {
-                    warn!("{}", e);
+                    warn!("{e}");
                     Ok(())
                 }
                 Err(e) => Err(e.into()),
@@ -68,7 +68,7 @@ pub async fn submit_or_update_request(
         .await
         .map_err(Into::into),
         RepoHandle::GitNone { url } => {
-            warn!("Not sending a pull request for {}", url);
+            warn!("Not sending a pull request for {url}");
             Ok(())
         }
     }
@@ -108,7 +108,7 @@ pub async fn submit_error_report(
 
             match res {
                 Err(e @ github::PullRequestError::ReadOnlyRepo) => {
-                    warn!("{}", e);
+                    warn!("{e}");
                 }
                 Err(e) => return Err(e.into()),
                 Ok(()) => (),
@@ -131,7 +131,7 @@ pub async fn submit_error_report(
             .await?;
         }
         RepoHandle::GitNone { url } => {
-            warn!("Not submitting an error report for {}", url);
+            warn!("Not submitting an error report for {url}");
         }
     }
     Ok(())

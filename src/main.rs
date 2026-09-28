@@ -117,7 +117,7 @@ async fn update_repo(
     settings: UpdateSettings,
     previous_update: Arc<TMutex<Instant>>,
 ) -> Result<(), UpdateError> {
-    info!("Updating {}", handle);
+    info!("Updating {handle}");
 
     let repo = UDRepo::init(state, &settings, &handle)?;
     let workdir = repo.path().unwrap();
@@ -158,7 +158,7 @@ async fn update_repo(
         *locked_ts = Instant::now();
         res?;
     } else {
-        info!("{}: Nothing to update", handle);
+        info!("{handle}: Nothing to update");
         if diff_default.len() > 0 {
             repo.push(state, &settings)?;
 
@@ -210,7 +210,7 @@ where
     E: std::fmt::Display,
 {
     Box::new(move |err| {
-        error!("{}: {}", description, err.to_string());
+        error!("{description}: {err}");
         std::process::exit(code);
     })
 }
@@ -261,12 +261,12 @@ async fn main() {
     builder.filter_level(options.verbosity).init();
 
     if let Some(SubCommand::DiffLocks { old, new }) = options.subcmd {
-        debug!("old:\n{:#?}", old);
-        debug!("new:\n{:#?}", new);
+        debug!("old:\n{old:#?}");
+        debug!("new:\n{new:#?}");
         let diff = old
             .diff(&new)
             .unwrap_or_else(good_panic("Unable to generate a diff", 65));
-        debug!("diff:\n{:#?}", diff);
+        debug!("diff:\n{diff:#?}");
         println!("{}", diff.spaced());
         std::process::exit(0);
     }
@@ -288,17 +288,17 @@ async fn main() {
 
     match options.subcmd {
         Some(SubCommand::CheckConfig) => {
-            info!("Config parsed successfully: \n{:#?}", config);
+            info!("Config parsed successfully: \n{config:#?}");
             let settings: Result<UpdateSettings, _> = config.settings.try_into();
             match settings {
-                Err(e) => warn!("The default settings are incomplete, you must complete them for each separate repo: {}", e),
-                Ok(s) => info!("Default settings are complete:\n{:#?}", s)
+                Err(e) => warn!("The default settings are incomplete, you must complete them for each separate repo: {e}"),
+                Ok(s) => info!("Default settings are complete:\n{s:#?}")
             }
 
             std::process::exit(0);
         }
         _ => {
-            debug!("{:?}", config);
+            debug!("{config:?}");
         }
     }
 
@@ -347,7 +347,7 @@ async fn main() {
                         *locked_ts = Instant::now();
 
                         if let Err(e) = result {
-                            error!("An error occurred while submitting the error report: {}", e);
+                            error!("An error occurred while submitting the error report: {e}");
                         }
                         Err(())
                     }
