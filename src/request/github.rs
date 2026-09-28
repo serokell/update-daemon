@@ -122,7 +122,7 @@ pub async fn submit_issue_or_pull_request_comment(
         let me = crab.current().user().await?.login;
 
         // FIXME: technically this might match unrelated issues if the user is not uniquely used by this bot
-        let query = format!("state:open is:issue author:{} repo:{}/{}", me, owner, repo);
+        let query = format!("state:open is:issue author:{me} repo:{owner}/{repo}");
 
         let mut page = crab
             .search()

@@ -59,8 +59,7 @@ pub enum Locked {
 impl Locked {
     fn get_hash(self) -> String {
         match self {
-            Locked::Git { nar_hash, .. } => nar_hash,
-            Locked::Other { nar_hash, .. } => nar_hash,
+            Locked::Git { nar_hash, .. } | Locked::Other { nar_hash, .. } => nar_hash,
         }
     }
 }
@@ -115,8 +114,8 @@ impl Lock {
         self.nodes.get(&self.resolve_input(dep)?)?.locked.clone()
     }
 
-    pub fn get_root_dep(&self, name: String) -> Option<Locked> {
-        self.get_dep(self.root_deps()?.get(&name)?.clone())
+    pub fn get_root_dep(&self, name: &str) -> Option<Locked> {
+        self.get_dep(self.root_deps()?.get(name)?.clone())
     }
 
     pub fn diff(&self, new: &Self) -> Result<LockDiff, LockDiffError> {
@@ -127,7 +126,7 @@ impl Lock {
                 .get_dep(input_a)
                 .ok_or_else(|| LockDiffError::MissingNodeError(key.clone(), "root".to_string()))?;
 
-            match self.get_root_dep(key.clone()) {
+            match self.get_root_dep(&key) {
                 Some(value_b) => {
                     if value_a.clone().get_hash() != value_b.clone().get_hash() {
                         diff.insert(
@@ -194,14 +193,14 @@ fn format_date(date: i64) -> String {
 fn show_hash_and_date(
     f: &mut Formatter,
     hash: &str,
-    last_modified: &Option<i64>,
+    last_modified: Option<i64>,
 ) -> Result<(), std::fmt::Error> {
     match last_modified {
         Some(last_modified) => write!(
             f,
             "{} ({})",
             hash.get(..10).unwrap(),
-            format_date(*last_modified)
+            format_date(last_modified)
         )?,
         None => write!(f, "{}", hash.get(..10).unwrap())?,
     }
@@ -213,12 +212,12 @@ impl Display for Locked {
         match self {
             Locked::Git {
                 rev, last_modified, ..
-            } => show_hash_and_date(f, rev, last_modified)?,
+            } => show_hash_and_date(f, rev, *last_modified)?,
             Locked::Other {
                 nar_hash,
                 last_modified,
-            } => show_hash_and_date(f, nar_hash, last_modified)?,
-        };
+            } => show_hash_and_date(f, nar_hash, *last_modified)?,
+        }
         Ok(())
     }
 }
@@ -249,12 +248,10 @@ impl InputChange {
             {
                 match type_new.as_str() {
                     "github" => Some(format!(
-                        "https://github.com/{}/{}/compare/{}...{}?expand=1",
-                        owner_new, repo_new, rev_old, rev_new
+                        "https://github.com/{owner_new}/{repo_new}/compare/{rev_old}...{rev_new}?expand=1"
                     )),
                     "gitlab" => Some(format!(
-                        "https://gitlab.com/{}/{}/compare/{}...{}",
-                        owner_new, repo_new, rev_old, rev_new
+                        "https://gitlab.com/{owner_new}/{repo_new}/compare/{rev_old}...{rev_new}"
                     )),
                     _ => None,
                 }
@@ -267,14 +264,8 @@ impl InputChange {
                 rev,
                 ..
             }) => match r#type.as_str() {
-                "github" => Some(format!(
-                    "https://github.com/{}/{}/tree/{}",
-                    owner, repo, rev
-                )),
-                "gitlab" => Some(format!(
-                    "https://gitlab.com/{}/{}/-/tree/{}",
-                    owner, repo, rev
-                )),
+                "github" => Some(format!("https://github.com/{owner}/{repo}/tree/{rev}")),
+                "gitlab" => Some(format!("https://gitlab.com/{owner}/{repo}/-/tree/{rev}")),
                 _ => None,
             },
             _ => None,
@@ -283,23 +274,22 @@ impl InputChange {
 
     pub fn markdown(&self) -> String {
         let change = match self.clone() {
-            InputChange::Add(l) => format!("(new) | `{}`", l),
-            InputChange::Update { old, new } => format!("`{}` | `{}`", old, new),
+            InputChange::Add(l) => format!("(new) | `{l}`"),
+            InputChange::Update { old, new } => format!("`{old}` | `{new}`"),
             InputChange::Delete => "(deleted) | (deleted)".to_string(),
         };
         format!(
             "{} | {}",
             change,
             self.link()
-                .map(|l| format!("[link]({})", l))
-                .unwrap_or_else(|| "_none_".to_string())
+                .map_or_else(|| "_none_".to_string(), |l| format!("[link]({l})"))
         )
     }
 
     pub fn spaced(&self) -> String {
         match self {
             InputChange::Add(l) => format!("{:<23}    {}", "(new)", l),
-            InputChange::Update { old, new } => format!("{:<23} -> {}", old, new),
+            InputChange::Update { old, new } => format!("{old:<23} -> {new}"),
             InputChange::Delete => format!("{0:<23}    {0}", "(deleted)"),
         }
     }
@@ -317,7 +307,7 @@ impl LockDiff {
     }
 
     pub fn spaced(&self) -> String {
-        let max = self.0.clone().keys().map(|l| l.len()).max().unwrap_or(0);
+        let max = self.0.clone().keys().map(String::len).max().unwrap_or(0);
         let mut s = String::new();
         for (name, change) in self.0.clone() {
             let mut name = name.clone();

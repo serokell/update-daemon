@@ -55,15 +55,15 @@ fn flake_update(
 
     // If a list of inputs to update is provided, update only the specified inputs
     if !settings.inputs.is_empty() {
-        for input in settings.inputs.iter() {
+        for input in &settings.inputs {
             // Abort flake update if input is missing from the flake.lock root nodes
             // and allow_missing_inputs is not set
-            if !settings.allow_missing_inputs && lock.get_root_dep(input.clone()).is_none() {
+            if !settings.allow_missing_inputs && lock.get_root_dep(input).is_none() {
                 return Err(FlakeUpdateError::MissingInput(input.clone()));
-            };
+            }
             nix_flake_update.arg(input);
         }
-    };
+    }
 
     nix_flake_update.arg("--no-warn-dirty");
     nix_flake_update.current_dir(workdir.to_str().unwrap());
@@ -134,19 +134,19 @@ async fn update_repo(
     let diff = before.diff(&after)?;
     let diff_default = default_branch_lock.diff(&after)?;
 
-    let mut body = diff_default.markdown();
-    body.push_str(&format!(
-        "\nLast updated: {}\n\n{}",
+    let body = format!(
+        "{}\nLast updated: {}\n\n{}",
+        diff_default.markdown(),
         chrono::Utc::now(),
         settings.extra_body
-    ));
+    );
 
     let delay = settings.cooldown;
 
     if diff.len() > 0 {
         info!("{}:\n{}", handle, diff_default.spaced());
         repo.soft_reset_to_default(&settings)?;
-        repo.commit(&settings, diff_default.spaced())?;
+        repo.commit(&settings, &diff_default.spaced())?;
         repo.push(state, &settings)?;
 
         let mut locked_ts = previous_update.lock().await;
@@ -212,20 +212,32 @@ where
     })
 }
 
+/// Parses the SSH config at `path`. Returns `None` if the path doesn't
+/// exist, can't be opened, or can't be parsed. A missing path is silent;
+/// any other failure is logged and the config is ignored.
+fn parse_ssh_config_if_exists(path: &Path) -> Option<SshConfig> {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return None,
+        Err(err) => {
+            warn!("Ignoring {}: {err}", path.display());
+            return None;
+        }
+    };
+    SshConfig::default()
+        .parse(
+            &mut BufReader::new(file),
+            ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS
+                | ssh2_config::ParseRule::ALLOW_UNSUPPORTED_FIELDS,
+        )
+        .inspect_err(|err| warn!("Ignoring {}: {err}", path.display()))
+        .ok()
+}
+
 fn init_update_state() -> UpdateState {
-    let global_ssh_config =
-        File::open("/etc/ssh/ssh_config")
-            .ok()
-            .and_then(|global_ssh_config_file| {
-                SshConfig::default()
-                    .parse(
-                        &mut BufReader::new(global_ssh_config_file),
-                        ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS,
-                    )
-                    .ok()
-            });
+    let global_ssh_config = parse_ssh_config_if_exists(Path::new("/etc/ssh/ssh_config"));
     let local_ssh_config =
-        SshConfig::parse_default_file(ssh2_config::ParseRule::ALLOW_UNKNOWN_FIELDS).ok();
+        std::env::home_dir().and_then(|home| parse_ssh_config_if_exists(&home.join(".ssh/config")));
     let cache_dir = BaseDirectories::new()
         .unwrap()
         .create_cache_directory("update-daemon")
@@ -308,12 +320,12 @@ async fn main() {
                     error!("{}: {}", repo_longlived.handle, e);
                     Err(())
                 }
-                Ok(settings) => match update_repo(
+                Ok(settings) => match Box::pin(update_repo(
                     repo.handle.clone(),
                     &state,
                     (&settings as &UpdateSettings).clone(),
                     ts_copy1,
-                )
+                ))
                 .await
                 {
                     Err(e) => {
@@ -322,14 +334,11 @@ async fn main() {
                         let delay = (&settings as &UpdateSettings).cooldown;
                         let mut locked_ts = ts_copy2.lock().await;
                         wait_for_delay(*locked_ts, delay).await;
-                        let result = request::submit_error_report(
+                        let result = Box::pin(request::submit_error_report(
                             settings,
                             repo.handle,
-                            format!(
-                                "I tried updating flake.lock, but failed:\n\n```\n{}\n```",
-                                e
-                            ),
-                        )
+                            format!("I tried updating flake.lock, but failed:\n\n```\n{e}\n```"),
+                        ))
                         .await;
 
                         *locked_ts = Instant::now();
