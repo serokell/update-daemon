@@ -175,7 +175,7 @@ pub fn init_repo(
     fetch_options.remote_callbacks(callbacks(state));
 
     let repo = if repo_dir.exists() {
-        debug!("Repository {} found at {:?}", handle, repo_dir);
+        debug!("Repository {handle} found at {}", repo_dir.display());
 
         let repo = Repository::open(repo_dir).map_err(InitError::OpenRepository)?;
 
@@ -204,7 +204,7 @@ pub fn init_repo(
 
         repo
     } else {
-        debug!("Cloning {} to {:?}", handle, repo_dir);
+        debug!("Cloning {handle} to {}", repo_dir.display());
 
         create_dir(&repo_dir).map_err(InitError::CreateCloneDir)?;
 

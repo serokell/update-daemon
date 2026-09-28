@@ -182,7 +182,9 @@ impl LockDiff {
 }
 
 fn format_date(date: i64) -> String {
-    let naive = chrono::NaiveDateTime::from_timestamp_opt(date, 0).unwrap();
+    let naive = chrono::DateTime::from_timestamp(date, 0)
+        .unwrap()
+        .naive_utc();
 
     let datetime: chrono::DateTime<chrono::Utc> =
         chrono::DateTime::from_naive_utc_and_offset(naive, chrono::Utc);
