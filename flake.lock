@@ -1887,11 +1887,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784438913,
-        "narHash": "sha256-NYF7ZM5ip0u+w1pBFDpIGEbrbgN/wpnLFAmBkWkYMXw=",
+        "lastModified": 1791101754,
+        "narHash": "sha256-y/GF+9B0t0TZ0nQiSRMqDXpr76yT7sdDbS/3GNLhzkE=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "afacd6819d3765a05814ee8e3de74c77d42ac799",
+        "rev": "dbc715a4b7c0ace63b9769a032d1dd34cd89e5bd",
         "type": "github"
       },
       "original": {
@@ -1913,11 +1913,11 @@
         "weeder-src": "weeder-src"
       },
       "locked": {
-        "lastModified": 1784409738,
-        "narHash": "sha256-vvhBMCJ+ILKJHh+PWrzmq5n+68H762ta0/m0VYXLX0w=",
+        "lastModified": 1790684872,
+        "narHash": "sha256-BNDmH/FX7ZkXxQ6x7Yd72fEI4elmc7CRbF1w2JWY1mU=",
         "owner": "serokell",
         "repo": "serokell.nix",
-        "rev": "e2101c7edee5136c29aeef3d76c5117d3af8753c",
+        "rev": "7888507928e981be46e1dd7f372f5293f7476d27",
         "type": "github"
       },
       "original": {
