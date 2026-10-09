@@ -28,7 +28,7 @@
             rust-overlay.overlays.default
           ];
         };
-        rustChannel = (pkgs.rust-bin.fromRustupToolchain { channel = "1.77.1"; }).override({
+        rustChannel = (pkgs.rust-bin.fromRustupToolchain { channel = "1.88.0"; }).override({
           extensions = [
             "clippy"
             "rust-analysis"
@@ -67,6 +67,7 @@
               pkgs.lib.makeBinPath [ nix pkgs.gitMinimal ]
             }";
 
+          doCheck = true;
           cargoTestCommands = x: x ++ [
             # pedantic clippy
             ''cargo clippy --all --all-features --tests -- \

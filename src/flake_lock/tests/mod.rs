@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 fn get_resources(test: &'static str) -> PathBuf {
     let mut d = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    d.push(format!("src/flake_lock/tests/{}", test));
+    d.push(format!("src/flake_lock/tests/{test}"));
     d
 }
 
@@ -26,7 +26,7 @@ fn parses_locks_correctly() {
 
         let lock_golden = std::fs::read_to_string(repo).unwrap();
 
-        assert_eq!(format!("{:#?}", lock), lock_golden);
+        assert_eq!(format!("{lock:#?}"), lock_golden);
     }
 }
 
@@ -50,7 +50,7 @@ fn diffs_correct() {
             );
 
             let mut expected_path = get_resources(res1);
-            expected_path.push(format!("{}.expected", res2));
+            expected_path.push(format!("{res2}.expected"));
 
             let expected = std::fs::read_to_string(expected_path).unwrap();
 
