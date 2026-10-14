@@ -49,7 +49,7 @@ pub async fn submit_or_update_request(
                     Ok(())
                 }
                 Err(e) => Err(e.into()),
-                Ok(_) => Ok(()),
+                Ok(()) => Ok(()),
             }
         }
         RepoHandle::GitLab {
@@ -66,7 +66,7 @@ pub async fn submit_or_update_request(
             submit,
         )
         .await
-        .map_err(|e| e.into()),
+        .map_err(Into::into),
         RepoHandle::GitNone { url } => {
             warn!("Not sending a pull request for {}", url);
             Ok(())
@@ -95,7 +95,7 @@ pub async fn submit_error_report(
             token_env_var,
             ..
         } => {
-            let res = github::submit_issue_or_pull_request_comment(
+            let res = Box::pin(github::submit_issue_or_pull_request_comment(
                 settings,
                 base_url,
                 owner,
@@ -103,7 +103,7 @@ pub async fn submit_error_report(
                 token_env_var,
                 ERROR_REPORT_TITLE.to_string(),
                 report,
-            )
+            ))
             .await;
 
             match res {
@@ -111,7 +111,7 @@ pub async fn submit_error_report(
                     warn!("{}", e);
                 }
                 Err(e) => return Err(e.into()),
-                Ok(_) => (),
+                Ok(()) => (),
             }
         }
         RepoHandle::GitLab {
